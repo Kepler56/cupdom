@@ -995,21 +995,33 @@
 </div>
 
 <div class="modal-overlay" id="qr-modal">
-  <div class="modal" style="max-width:460px">
+  <div class="modal" style="max-width:560px">
     <div class="modal-header">
-      <h2>QR code sponsor</h2>
+      <h2>Campagnes &amp; QR codes</h2>
       <button class="modal-close" data-close="qr-modal"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
     </div>
     <div class="modal-body">
-      <p style="font-size:13px;color:var(--text-muted);margin-bottom:10px">
-        Entrez le « slug » de la campagne (ex. <code>brandx</code>) — il doit correspondre à une ligne de <code>qr_campaigns</code>. Le QR pointe vers votre redirecteur de tracking.
-      </p>
-      <div style="display:flex;gap:8px;margin-bottom:6px">
-        <input type="text" id="qr-slug" placeholder="brandx" autocomplete="off" style="flex:1">
-        <button class="btn btn-primary" id="btn-gen-qr">Générer</button>
+      <h3 style="font-size:14px;font-weight:600;margin-bottom:8px">Nouvelle campagne</h3>
+      <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:8px">
+        <input type="text" id="qr-c-sponsor" placeholder="Nom du sponsor (ex. Adidas)" autocomplete="off">
+        <input type="text" id="qr-c-product" placeholder="Produit (ex. gourde, tote, test)" autocomplete="off">
+        <input type="url" id="qr-c-dest" placeholder="URL de destination (https://www.adidas.fr/)" autocomplete="off">
+        <div style="display:flex;gap:8px;align-items:center">
+          <input type="text" id="qr-c-slug" placeholder="slug (auto)" autocomplete="off" style="flex:1">
+          <label style="font-size:13px;color:var(--text-muted);display:flex;align-items:center;gap:6px;white-space:nowrap">
+            <input type="checkbox" id="qr-c-active" checked> Active
+          </label>
+          <button class="btn btn-primary" id="btn-create-campaign">Créer</button>
+        </div>
       </div>
-      <div id="qr-url" style="font-size:12px;color:var(--text-muted);word-break:break-all;margin-bottom:14px"></div>
-      <div id="qr-canvas-wrap" style="display:flex;justify-content:center;align-items:center;min-height:220px"></div>
+      <div style="border-top:1px solid var(--border);margin:14px 0"></div>
+
+      <h3 style="font-size:14px;font-weight:600;margin-bottom:8px">Campagnes existantes</h3>
+      <div id="qr-campaign-list" style="max-height:220px;overflow-y:auto;font-size:13px"><div class="cell-muted" style="padding:8px 0">Chargement…</div></div>
+      <div style="border-top:1px solid var(--border);margin:14px 0"></div>
+
+      <div id="qr-url" style="font-size:12px;color:var(--text-muted);word-break:break-all;margin-bottom:10px"></div>
+      <div id="qr-canvas-wrap" style="display:flex;justify-content:center;align-items:center;min-height:60px"></div>
       <div id="qr-actions" style="display:none;gap:8px;justify-content:center;margin-top:14px">
         <button class="btn" id="btn-dl-png">Télécharger PNG</button>
         <button class="btn" id="btn-dl-svg">Télécharger SVG</button>
@@ -2524,7 +2536,10 @@ async function doRestore(mode) {
 }
 
 document.getElementById('btn-qr').addEventListener('click', openQrModal);
-document.getElementById('btn-gen-qr').addEventListener('click', generateQr);
+document.getElementById('btn-create-campaign').addEventListener('click', createCampaign);
+document.getElementById('qr-c-sponsor').addEventListener('input', autoSlug);
+document.getElementById('qr-c-slug').addEventListener('input', e => { e.target.dataset.touched = '1'; });
+document.getElementById('qr-campaign-list').addEventListener('click', onCampaignListClick);
 document.getElementById('btn-dl-png').addEventListener('click', downloadQrPng);
 document.getElementById('btn-dl-svg').addEventListener('click', downloadQrSvg);
 document.getElementById('btn-backup').addEventListener('click', openBackupModal);
@@ -2538,20 +2553,120 @@ document.getElementById('btn-do-restore-replace').addEventListener('click', () =
 // ============================================================
 let lastQr = null;     // the qrcode-generator object (for PNG painting)
 let lastQrSvg = '';    // SVG string (for display + SVG download)
+let qrCampaigns = [];  // cached campaign list
+
+function slugify(s) {
+  return (s || '').toLowerCase().trim()
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')   // strip accents
+    .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+}
 
 function openQrModal() {
   closeAllModals();
-  document.getElementById('qr-slug').value = '';
+  ['qr-c-sponsor', 'qr-c-product', 'qr-c-dest', 'qr-c-slug'].forEach(id => { document.getElementById(id).value = ''; });
+  document.getElementById('qr-c-slug').dataset.touched = '';
+  document.getElementById('qr-c-active').checked = true;
   document.getElementById('qr-url').textContent = '';
   document.getElementById('qr-canvas-wrap').innerHTML = '';
   document.getElementById('qr-actions').style.display = 'none';
   document.getElementById('qr-modal').classList.add('active');
+  loadCampaigns();
 }
 
-function generateQr() {
-  const raw = (document.getElementById('qr-slug').value || '').trim().toLowerCase();
-  const slug = raw.replace(/[^a-z0-9-]/g, '');
-  if (!slug) { showToast('Entrez un slug (ex. brandx)', 'error'); return; }
+function autoSlug() {
+  const slugInput = document.getElementById('qr-c-slug');
+  if (slugInput.dataset.touched === '1') return;        // don't override a manual edit
+  slugInput.value = slugify(document.getElementById('qr-c-sponsor').value);
+}
+
+async function loadCampaigns() {
+  const box = document.getElementById('qr-campaign-list');
+  box.innerHTML = '<div class="cell-muted" style="padding:8px 0">Chargement…</div>';
+  try {
+    qrCampaigns = (await sbRequest('GET', '/qr_campaigns?select=*&order=created_at.desc')) || [];
+  } catch (e) {
+    box.innerHTML = '<div class="cell-muted" style="padding:8px 0">Erreur de chargement</div>';
+    showToast('Erreur : ' + e.message, 'error');
+    return;
+  }
+  renderCampaignList();
+}
+
+function renderCampaignList() {
+  const box = document.getElementById('qr-campaign-list');
+  if (!qrCampaigns.length) {
+    box.innerHTML = '<div class="cell-muted" style="padding:8px 0">Aucune campagne pour le moment.</div>';
+    return;
+  }
+  box.innerHTML = qrCampaigns.map(c => {
+    const status = c.active
+      ? '<span style="color:var(--success)">● active</span>'
+      : '<span style="color:var(--text-muted)">○ inactive</span>';
+    return `<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border)">
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:600">${escapeHtml(c.sponsor_name)} <span style="color:var(--text-muted);font-weight:400">/${escapeHtml(c.slug)}</span></div>
+        <div style="color:var(--text-muted);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(c.product || '')} → ${escapeHtml(c.destination_url)}</div>
+        <div style="font-size:12px">${status}</div>
+      </div>
+      <button class="btn btn-sm" data-qr-slug="${escapeHtml(c.slug)}">QR</button>
+      <button class="btn btn-sm" data-toggle-slug="${escapeHtml(c.slug)}">${c.active ? 'Désactiver' : 'Activer'}</button>
+    </div>`;
+  }).join('');
+}
+
+function onCampaignListClick(e) {
+  const qrBtn = e.target.closest('[data-qr-slug]');
+  if (qrBtn) { generateQr(qrBtn.dataset.qrSlug); return; }
+  const tBtn = e.target.closest('[data-toggle-slug]');
+  if (tBtn) { toggleCampaignActive(tBtn.dataset.toggleSlug); return; }
+}
+
+async function createCampaign() {
+  const sponsor = document.getElementById('qr-c-sponsor').value.trim();
+  const product = document.getElementById('qr-c-product').value.trim();
+  const dest = document.getElementById('qr-c-dest').value.trim();
+  const slug = slugify(document.getElementById('qr-c-slug').value || sponsor);
+  const active = document.getElementById('qr-c-active').checked;
+
+  if (!sponsor) { showToast('Nom du sponsor requis', 'error'); return; }
+  if (!slug) { showToast('Slug invalide', 'error'); return; }
+  if (!/^https?:\/\//i.test(dest)) { showToast('URL de destination invalide (doit commencer par http)', 'error'); return; }
+
+  const btn = document.getElementById('btn-create-campaign');
+  btn.disabled = true;
+  try {
+    await sbRequest('POST', '/qr_campaigns', {
+      slug, sponsor_name: sponsor, product: product || null, destination_url: dest, active,
+    });
+    showToast('Campagne créée', 'success');
+    ['qr-c-sponsor', 'qr-c-product', 'qr-c-dest', 'qr-c-slug'].forEach(id => { document.getElementById(id).value = ''; });
+    document.getElementById('qr-c-slug').dataset.touched = '';
+    document.getElementById('qr-c-active').checked = true;
+    await loadCampaigns();
+  } catch (e) {
+    const msg = /duplicate key|already exists|23505/i.test(e.message)
+      ? 'Ce slug existe déjà — choisissez-en un autre.'
+      : 'Erreur : ' + e.message;
+    showToast(msg, 'error');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function toggleCampaignActive(slug) {
+  const c = qrCampaigns.find(x => x.slug === slug);
+  if (!c) return;
+  try {
+    await sbRequest('PATCH', `/qr_campaigns?slug=eq.${encodeURIComponent(slug)}`, { active: !c.active });
+    await loadCampaigns();
+  } catch (e) {
+    showToast('Erreur : ' + e.message, 'error');
+  }
+}
+
+function generateQr(slugArg) {
+  const slug = slugify(slugArg);
+  if (!slug) { showToast('Slug invalide', 'error'); return; }
   const base = QR_BASE_URL.replace(/\/$/, '');
   const url = `${base}/s/${slug}`;
   document.getElementById('qr-url').textContent = url;
@@ -2570,7 +2685,7 @@ function generateQr() {
   const wrap = document.getElementById('qr-canvas-wrap');
   wrap.innerHTML = lastQrSvg;
   const svg = wrap.querySelector('svg');
-  if (svg) { svg.setAttribute('width', '220'); svg.setAttribute('height', '220'); }
+  if (svg) { svg.setAttribute('width', '200'); svg.setAttribute('height', '200'); }
 
   document.getElementById('btn-dl-png').dataset.slug = slug;
   document.getElementById('qr-actions').style.display = 'flex';
