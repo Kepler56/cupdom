@@ -1,0 +1,24 @@
+# ── Secrets — NEVER commit ────────────────────────────────
+.env
+.env.*
+
+# ── Data / exports (may contain personal data) ────────────
+eu_contacts.csv
+qr_out/
+
+# ── Local tooling, not needed to deploy ───────────────────
+*.py
+generate_qr.py
+lemlist_*.py
+
+# ── Notes / docs ──────────────────────────────────────────
+docs/
+*.md
+
+# ── Tests ─────────────────────────────────────────────────
+*.test.mjs
+
+# ── OS / editor cruft ─────────────────────────────────────
+.DS_Store
+Thumbs.db
+*.log
