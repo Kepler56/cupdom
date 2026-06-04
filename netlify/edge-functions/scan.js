@@ -7,6 +7,31 @@ export default async (request, context) => {
   const DAILY_SECRET = Netlify.env.get('QR_DAILY_SECRET') || '';
   const FALLBACK     = Netlify.env.get('QR_FALLBACK_URL') || 'https://cupdom.fr';
 
+  // --- TEMPORARY DIAGNOSTIC: GET /s/__diag reports config health, no secrets revealed. ---
+  // Remove this block once tracking is confirmed working.
+  if (slug === '__diag') {
+    const keyType = !SERVICE_KEY ? 'MISSING (env var not set)'
+      : SERVICE_KEY.startsWith('sb_secret_') ? 'sb_secret_ (correct type)'
+      : SERVICE_KEY.startsWith('sb_publishable_') ? 'sb_publishable_ (WRONG — this is the PUBLIC key)'
+      : SERVICE_KEY.startsWith('eyJ') ? 'legacy JWT (must be the service_role one, not anon)'
+      : 'unknown format';
+    let lookupStatus = null, lookupBody = null;
+    try {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/qr_campaigns?slug=eq.adidas&select=destination_url,active`,
+        { headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}` } });
+      lookupStatus = r.status;
+      lookupBody = await r.text();
+    } catch (e) { lookupBody = 'fetch error: ' + e.message; }
+    return new Response(JSON.stringify({
+      has_SUPABASE_URL: !!SUPABASE_URL,
+      SUPABASE_URL: SUPABASE_URL || null,
+      service_key_type: keyType,
+      lookup_http_status: lookupStatus,
+      lookup_body: lookupBody,
+      fallback_url: FALLBACK,
+    }, null, 2), { headers: { 'content-type': 'application/json' } });
+  }
+
   // 1. Look up the campaign (service-role key bypasses RLS).
   let destination = null;
   try {
