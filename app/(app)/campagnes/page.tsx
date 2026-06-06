@@ -2,14 +2,17 @@
 
 import { Suspense, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
+import { Button } from '@/components/atoms/Button';
 import { CampaignsList } from '@/components/organisms/CampaignsList';
-import { useScopeFilter } from '@/lib/scope';
+import { CampaignCreateForm } from '@/components/organisms/CampaignCreateForm';
+import { useScope, useScopeFilter } from '@/lib/scope';
 import { useProfiles } from '@/lib/profiles';
 import { listScopeCampaigns, type CampaignWithOwner } from '@/lib/campaigns/campaigns';
 import { emptyStats, loadCampaignStats } from '@/lib/campaigns/stats';
 import type { CampaignRowVM, CampaignStats } from '@/types/domain';
 
 function CampagnesInner() {
+  const { scope } = useScope();
   const scopeFilter = useScopeFilter();
   const { profiles } = useProfiles();
   const dealFilter = useSearchParams().get('deal');
@@ -18,6 +21,9 @@ function CampagnesInner() {
   const [stats, setStats] = useState<Record<string, CampaignStats>>({});
   const [loading, setLoading] = useState(true);
   const [reloadKey, setReloadKey] = useState(0);
+  const [creating, setCreating] = useState(false);
+
+  const reload = () => setReloadKey((k) => k + 1);
 
   useEffect(() => {
     let active = true;
@@ -58,7 +64,27 @@ function CampagnesInner() {
 
   if (loading) return <p className="text-sm text-text-muted">Chargement…</p>;
 
-  return <CampaignsList rows={rows} onChanged={() => setReloadKey((k) => k + 1)} />;
+  return (
+    <div className="space-y-4">
+      {scope.kind === 'me' && (
+        <div className="flex justify-end">
+          <Button onClick={() => setCreating(true)}>+ Nouvelle campagne</Button>
+        </div>
+      )}
+
+      <CampaignsList rows={rows} onChanged={reload} />
+
+      {creating && (
+        <CampaignCreateForm
+          onClose={() => setCreating(false)}
+          onCreated={() => {
+            setCreating(false);
+            reload();
+          }}
+        />
+      )}
+    </div>
+  );
 }
 
 export default function CampagnesPage() {

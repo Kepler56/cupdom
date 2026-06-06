@@ -1,12 +1,15 @@
 'use client';
 
-import { useState, type ReactNode } from 'react';
-import { Power, QrCode } from 'lucide-react';
+import { useState } from 'react';
+import { History, MoreHorizontal, Pencil, Power, QrCode, Trash2 } from 'lucide-react';
 import { Icon } from '@/components/atoms/Icon';
 import { OwnerChip } from '@/components/molecules/OwnerChip';
 import { CampaignStateBadge } from '@/components/molecules/CampaignStateBadge';
 import { CampaignStatsCells } from '@/components/molecules/CampaignStatsCells';
 import { QrDialog } from '@/components/molecules/QrDialog';
+import { DestinationEditDialog } from '@/components/molecules/DestinationEditDialog';
+import { DeleteCampaignDialog } from '@/components/molecules/DeleteCampaignDialog';
+import { CampaignEventLog } from '@/components/organisms/CampaignEventLog';
 import { useCanEdit } from '@/lib/scope';
 import { setCampaignState } from '@/lib/campaigns/campaigns';
 import type { CampaignRowVM, CampaignState } from '@/types/domain';
@@ -14,18 +17,21 @@ import type { CampaignRowVM, CampaignState } from '@/types/domain';
 interface CampaignRowProps {
   row: CampaignRowVM;
   onChanged: () => void;
-  /** Owner-only actions (edit destination / delete / history), injected by the create-flow plan. */
-  actions?: ReactNode;
 }
 
 /**
- * One campaign row. QR view/download is available to everyone (AC-9); the state toggle
- * and owner actions render ONLY when `useCanEdit(ownerId)` is true (owner + scope Moi).
- * Colleague/Tous scope and legacy (ownerId === null) rows are read-only with an owner chip (AC-16/26).
+ * One campaign row. QR view/download + Historique are available to everyone (AC-9/17);
+ * the state toggle and edit/delete actions render ONLY when `useCanEdit(ownerId)` is true
+ * (owner + scope Moi). Colleague/Tous scope and legacy (ownerId === null) rows are
+ * read-only with an owner chip (AC-16/26).
  */
-export function CampaignRow({ row, onChanged, actions }: CampaignRowProps) {
+export function CampaignRow({ row, onChanged }: CampaignRowProps) {
   const canEdit = useCanEdit(row.ownerId ?? '');
   const [qrOpen, setQrOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const next: CampaignState = row.state === 'Active' ? 'Terminée' : 'Active';
 
@@ -39,6 +45,10 @@ export function CampaignRow({ row, onChanged, actions }: CampaignRowProps) {
     } finally {
       setBusy(false);
     }
+  }
+
+  function closeMenu() {
+    setMenuOpen(false);
   }
 
   return (
@@ -78,11 +88,81 @@ export function CampaignRow({ row, onChanged, actions }: CampaignRowProps) {
           ) : (
             <span className="text-xs text-text-faint">— non lié</span>
           )}
-          {actions}
+
+          <div className="relative">
+            <button
+              type="button"
+              aria-label="Plus d'actions"
+              onClick={() => setMenuOpen((o) => !o)}
+              className="rounded-input p-1 text-text-muted hover:bg-canvas hover:text-text"
+            >
+              <Icon icon={MoreHorizontal} size={16} />
+            </button>
+            {menuOpen && (
+              <div className="absolute right-0 z-50 mt-1 w-52 overflow-hidden rounded-card border border-border bg-surface text-sm shadow-lg">
+                <button
+                  type="button"
+                  onClick={() => {
+                    closeMenu();
+                    setHistoryOpen(true);
+                  }}
+                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-text hover:bg-canvas"
+                >
+                  <Icon icon={History} size={14} /> Historique
+                </button>
+                {canEdit && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        closeMenu();
+                        setEditOpen(true);
+                      }}
+                      className="flex w-full items-center gap-2 px-3 py-2 text-left text-text hover:bg-canvas"
+                    >
+                      <Icon icon={Pencil} size={14} /> Modifier la destination
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        closeMenu();
+                        setDeleteOpen(true);
+                      }}
+                      className="flex w-full items-center gap-2 px-3 py-2 text-left text-danger-fg hover:bg-danger-bg"
+                    >
+                      <Icon icon={Trash2} size={14} /> Supprimer
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </td>
 
       {qrOpen && <QrDialog campaign={row} onClose={() => setQrOpen(false)} />}
+      {historyOpen && <CampaignEventLog slug={row.slug} onClose={() => setHistoryOpen(false)} />}
+      {editOpen && (
+        <DestinationEditDialog
+          campaign={row}
+          onClose={() => setEditOpen(false)}
+          onDone={() => {
+            setEditOpen(false);
+            onChanged();
+          }}
+        />
+      )}
+      {deleteOpen && (
+        <DeleteCampaignDialog
+          campaign={row}
+          hasScans={row.stats.hasScans}
+          onClose={() => setDeleteOpen(false)}
+          onDone={() => {
+            setDeleteOpen(false);
+            onChanged();
+          }}
+        />
+      )}
     </tr>
   );
 }

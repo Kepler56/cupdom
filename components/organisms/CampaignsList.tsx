@@ -8,8 +8,6 @@ import type { CampaignRowVM } from '@/types/domain';
 interface CampaignsListProps {
   rows: CampaignRowVM[];
   onChanged: () => void;
-  /** Per-row owner actions (edit/delete/history), injected by the create-flow plan. */
-  renderActions?: (row: CampaignRowVM) => ReactNode;
 }
 
 function Headline({ rows }: { rows: CampaignRowVM[] }) {
@@ -42,7 +40,7 @@ function Headline({ rows }: { rows: CampaignRowVM[] }) {
   );
 }
 
-export function CampaignsList({ rows, onChanged, renderActions }: CampaignsListProps) {
+export function CampaignsList({ rows, onChanged }: CampaignsListProps) {
   return (
     <div className="space-y-4">
       <Headline rows={rows} />
@@ -67,12 +65,7 @@ export function CampaignsList({ rows, onChanged, renderActions }: CampaignsListP
             </thead>
             <tbody>
               {rows.map((row) => (
-                <CampaignRow
-                  key={row.slug}
-                  row={row}
-                  onChanged={onChanged}
-                  actions={renderActions?.(row)}
-                />
+                <CampaignRow key={row.slug} row={row} onChanged={onChanged} />
               ))}
             </tbody>
           </table>
