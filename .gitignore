@@ -1,6 +1,7 @@
 # ── Secrets — NEVER commit ────────────────────────────────
 .env
 .env.*
+!.env.local.example
 
 # ── Data / exports (may contain personal data) ────────────
 eu_contacts.csv
