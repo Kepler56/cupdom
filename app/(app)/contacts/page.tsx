@@ -12,18 +12,18 @@ import {
   contactToInput,
   createContact,
   deleteContact,
-  listContacts,
+  listContactsWithStatus,
   updateContact,
   type ContactInput,
 } from '@/lib/contacts';
-import type { Contact } from '@/types/domain';
+import type { Contact, ContactStatus } from '@/types/domain';
 
 export default function ContactsPage() {
   const { scope, myId } = useScope();
   const scopeFilter = useScopeFilter();
   const { profiles } = useProfiles();
 
-  const [contacts, setContacts] = useState<Contact[]>([]);
+  const [contacts, setContacts] = useState<ContactStatus[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [formOpen, setFormOpen] = useState(false);
@@ -34,7 +34,7 @@ export default function ContactsPage() {
   const reload = useCallback(async () => {
     setLoading(true);
     try {
-      setContacts(await listContacts());
+      setContacts(await listContactsWithStatus());
     } finally {
       setLoading(false);
     }

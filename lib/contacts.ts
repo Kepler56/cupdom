@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/client';
-import type { CompanySize, Contact, Sector } from '@/types/domain';
+import type { CompanySize, Contact, ContactStatus, Sector, Statut } from '@/types/domain';
 
 /** Shape of the form fields (empty string = "not set"). */
 export interface ContactInput {
@@ -92,6 +92,21 @@ export async function listContacts(): Promise<Contact[]> {
     .order('updated_at', { ascending: false });
   if (error) throw error;
   return (data as ContactRow[] | null ?? []).map(mapContact);
+}
+
+/** Non-archived contacts joined with their derived statut (public.contacts_with_status, Spec 1B). */
+export async function listContactsWithStatus(): Promise<ContactStatus[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from('contacts_with_status')
+    .select('*')
+    .is('archived_at', null)
+    .order('updated_at', { ascending: false });
+  if (error) throw error;
+  return (data as (ContactRow & { statut: Statut })[] | null ?? []).map((r) => ({
+    ...mapContact(r),
+    statut: r.statut,
+  }));
 }
 
 /** Insert a contact owned by the current member (RLS enforces owner_id = auth.uid()). */

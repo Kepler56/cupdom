@@ -1,17 +1,17 @@
 'use client';
 
 import { Pencil, Trash2 } from 'lucide-react';
-import { Tag } from '@/components/atoms/Tag';
 import { Icon } from '@/components/atoms/Icon';
 import { OwnerChip } from '@/components/molecules/OwnerChip';
+import { StatutBadge } from '@/components/molecules/StatutBadge';
 import { useCanEdit } from '@/lib/scope';
 import { contactDisplayName } from '@/lib/contacts';
-import type { Contact, Profile } from '@/types/domain';
+import type { Contact, ContactStatus, Profile } from '@/types/domain';
 
 const fmtDate = (iso: string) => new Intl.DateTimeFormat('fr-FR').format(new Date(iso));
 
 interface ContactsTableProps {
-  rows: Contact[];
+  rows: ContactStatus[];
   profiles: Record<string, Profile>;
   onEdit: (contact: Contact) => void;
   onDelete: (contact: Contact) => void;
@@ -23,7 +23,7 @@ function ContactRow({
   onEdit,
   onDelete,
 }: {
-  contact: Contact;
+  contact: ContactStatus;
   owner?: Profile;
   onEdit: (c: Contact) => void;
   onDelete: (c: Contact) => void;
@@ -39,8 +39,7 @@ function ContactRow({
       <td className="px-3 py-2.5 text-text-body">{contact.company ?? '—'}</td>
       <td className="px-3 py-2.5 text-text-body">{contact.sector ?? '—'}</td>
       <td className="px-3 py-2.5">
-        {/* Derived statut arrives with deals in plan 1B; "Prospect" until then. */}
-        <Tag tone="neutral">Prospect</Tag>
+        <StatutBadge statut={contact.statut} />
       </td>
       <td className="px-3 py-2.5">
         {owner ? <OwnerChip name={owner.displayName} color={owner.color} /> : '—'}
