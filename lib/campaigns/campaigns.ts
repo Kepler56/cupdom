@@ -1,7 +1,8 @@
 import { createClient } from '@/lib/supabase/client';
 import { normalizeUrl } from '@/lib/links';
 import { makeSlug } from '@/lib/campaigns/slug';
-import type { Campaign, CampaignState } from '@/types/domain';
+import { emptyStats, loadCampaignStats } from '@/lib/campaigns/stats';
+import type { Campaign, CampaignRowVM, CampaignState, CampaignStats, Profile } from '@/types/domain';
 
 /** Campaign joined to its effective owner (linked contact's owner) + display fields. */
 export interface CampaignWithOwner extends Campaign {
@@ -179,4 +180,46 @@ export async function deleteCampaign(slug: string): Promise<{ ok: boolean; reaso
   // BEFORE DELETE guard raises check_violation (SQLSTATE 23514) when scans exist.
   if (error.code === '23514' || /scan/i.test(error.message)) return { ok: false, reason: 'has_scans' };
   throw error;
+}
+
+// ── Row view-models (reused by the list page AND the Spec 3A export, AC-25) ───
+
+/**
+ * Pure mapper: campaigns + their stats + the profile map → list row view-models. The
+ * effective owner's name/colour are resolved for the OwnerChip; legacy rows keep null.
+ * Spec 3A's export loader reuses this so the CSV mirrors exactly what the list shows
+ * (1F "export mirrors visibility" contract) — it only adds the Leads count on top.
+ */
+export function toCampaignRowVMs(
+  campaigns: CampaignWithOwner[],
+  stats: Record<string, CampaignStats>,
+  profiles: Record<string, Profile>,
+): CampaignRowVM[] {
+  return campaigns.map((c) => {
+    const owner = c.ownerId ? profiles[c.ownerId] : undefined;
+    return {
+      ...c,
+      ownerName: owner?.displayName ?? null,
+      ownerColor: owner?.color ?? null,
+      stats: stats[c.slug] ?? emptyStats(c.slug),
+    };
+  });
+}
+
+/**
+ * Convenience selector: load all campaigns, apply a scope predicate (+ optional deal
+ * filter), load stats for just the visible set, and return ready-to-render/export rows.
+ * Spec 3A's `loadCampaignsExport` builds on this.
+ */
+export async function loadCampaignRows(
+  scopeMatches: (ownerId: string) => boolean,
+  profiles: Record<string, Profile>,
+  opts: { dealId?: string | null } = {},
+): Promise<CampaignRowVM[]> {
+  const all = await listScopeCampaigns();
+  const visible = all
+    .filter((c) => scopeMatches(c.ownerId ?? '')) // legacy (null) → only matches in "Tous"
+    .filter((c) => !opts.dealId || c.dealId === opts.dealId);
+  const stats = await loadCampaignStats(visible.map((c) => c.slug));
+  return toCampaignRowVMs(visible, stats, profiles);
 }

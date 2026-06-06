@@ -7,8 +7,8 @@ import { CampaignsList } from '@/components/organisms/CampaignsList';
 import { CampaignCreateForm } from '@/components/organisms/CampaignCreateForm';
 import { useScope, useScopeFilter } from '@/lib/scope';
 import { useProfiles } from '@/lib/profiles';
-import { listScopeCampaigns, type CampaignWithOwner } from '@/lib/campaigns/campaigns';
-import { emptyStats, loadCampaignStats } from '@/lib/campaigns/stats';
+import { listScopeCampaigns, toCampaignRowVMs, type CampaignWithOwner } from '@/lib/campaigns/campaigns';
+import { loadCampaignStats } from '@/lib/campaigns/stats';
 import type { CampaignRowVM, CampaignStats } from '@/types/domain';
 
 function CampagnesInner() {
@@ -44,23 +44,13 @@ function CampagnesInner() {
     };
   }, [reloadKey]);
 
-  const rows: CampaignRowVM[] = useMemo(
-    () =>
-      campaigns
-        // Legacy rows (ownerId null) are visible in "Tous" only; scopeFilter('') yields that.
-        .filter((c) => scopeFilter(c.ownerId ?? ''))
-        .filter((c) => !dealFilter || c.dealId === dealFilter)
-        .map((c) => {
-          const owner = c.ownerId ? profiles[c.ownerId] : undefined;
-          return {
-            ...c,
-            ownerName: owner?.displayName ?? null,
-            ownerColor: owner?.color ?? null,
-            stats: stats[c.slug] ?? emptyStats(c.slug),
-          };
-        }),
-    [campaigns, stats, scopeFilter, dealFilter, profiles],
-  );
+  const rows: CampaignRowVM[] = useMemo(() => {
+    // Legacy rows (ownerId null) are visible in "Tous" only; scopeFilter('') yields that.
+    const visible = campaigns
+      .filter((c) => scopeFilter(c.ownerId ?? ''))
+      .filter((c) => !dealFilter || c.dealId === dealFilter);
+    return toCampaignRowVMs(visible, stats, profiles);
+  }, [campaigns, stats, scopeFilter, dealFilter, profiles]);
 
   if (loading) return <p className="text-sm text-text-muted">Chargement…</p>;
 
