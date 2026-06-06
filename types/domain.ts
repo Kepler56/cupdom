@@ -230,3 +230,62 @@ export interface ExportDataset<T = unknown> {
   available: boolean;
   columns: CsvColumn<T>[];
 }
+
+// ── Campaigns (Spec 2A §2) ──────────────────────────────────────────────────
+// State is the existing qr_campaigns.active boolean surfaced as a French label.
+export type CampaignState = 'Active' | 'Terminée';
+export const CAMPAIGN_STATES: readonly CampaignState[] = ['Active', 'Terminée'] as const;
+
+export interface Campaign {
+  slug: string;                 // opaque, immutable PK (6–8 char base32-ish)
+  sponsorName: string;          // = linked contact's company at insert time (NOT NULL in DB)
+  name: string | null;          // friendly CRM name, e.g. "Nike Été 2026"
+  product: string | null;       // optional merch descriptor (gourde, tote…)
+  destinationUrl: string;       // http/https; editable; slug/QR never change
+  state: CampaignState;         // derived from `active` (Active=true, Terminée=false)
+  dealId: string | null;        // FK → deals.id (null = legacy/unlinked, managed by old index.html)
+  distributedCount: number | null; // owner-entered "Distribués" funnel input (Spec 3 reads this)
+  createdAt: string;            // ISO
+}
+
+// ── Campaign event log (Spec 2A §2/§6) ──────────────────────────────────────
+export type CampaignEventKind =
+  | 'create' | 'deactivate' | 'reactivate' | 'destination_change';
+
+export interface CampaignEvent {
+  id: string;
+  campaignSlug: string;
+  actorId: string | null;       // profiles.id of the acting owner (null for system)
+  kind: CampaignEventKind;
+  detail: string | null;        // e.g. "https://a → https://b" for a destination change
+  createdAt: string;            // ISO (rendered fr-FR date+time)
+}
+
+export const CAMPAIGN_EVENT_LABEL_FR: Record<CampaignEventKind, string> = {
+  create: 'Création',
+  deactivate: 'Désactivation',
+  reactivate: 'Réactivation',
+  destination_change: 'Changement de destination',
+};
+
+// ── Campaign headline stats (Spec 2A §3, AC-25/27) ──────────────────────────
+export interface CampaignStats {
+  slug: string;
+  totalScans: number;           // non-bot scans
+  uniquesPerDay: number;        // distinct visitor_hash among non-bot scans
+  bots: number;                 // is_bot = true scans
+  activeScans: number;          // non-bot scans tagged campaign_state_at_scan='Active'
+  termineeScans: number;        // non-bot scans tagged campaign_state_at_scan='Terminée'
+  leads: number;                // 0 until Spec 3 lands (placeholder source documented)
+  hasScans: boolean;            // (totalScans + bots) > 0 → delete disabled (AC-15)
+}
+
+// Row view-model the list renders (campaign joined to its effective owner + stats).
+export interface CampaignRowVM extends Campaign {
+  ownerId: string | null;       // effective owner = linked contact's owner (null for legacy rows)
+  ownerName: string | null;     // resolved display name for OwnerChip
+  ownerColor: string | null;    // resolved colour for OwnerChip
+  contactCompany: string | null;// = sponsorName, shown in the "Sponsor" column
+  dealTitle: string | null;     // linked deal label
+  stats: CampaignStats;
+}
