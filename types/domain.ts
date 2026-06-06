@@ -191,3 +191,24 @@ export const NOTIF_TYPE_LABEL_FR: Record<NotificationType, string> = {
   gone_quiet: 'Prospect silencieux',
   purge_warning: 'Suppression imminente',
 };
+
+// ── Archive / purge (Spec 1E §5.9) ──────────────────────────────────────────
+export const PURGE_WINDOW_DAYS = 30;
+export const PURGE_WARNING_DAYS = 3;
+
+/** An archived contact (archivedAt/purgeAfter guaranteed non-null in the Archivés view). */
+export interface ArchivedContact extends Contact {
+  archivedAt: string;
+  purgeAfter: string;
+}
+
+export interface PurgeCountdown {
+  daysLeft: number;
+  label: string; // French, e.g. "Supprimé dans 12 jours" / "Suppression imminente"
+  tone: 'warning' | 'danger';
+}
+
+/** Result of the archive/restore RPC wrappers (no throw on the expected blocked cases). */
+export type LifecycleResult =
+  | { ok: true }
+  | { ok: false; reason: 'not_owner' | 'active_campaign' | 'not_archived' | 'unknown'; message: string };
