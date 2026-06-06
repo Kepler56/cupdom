@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { ContactHubProfile } from './ContactHubProfile';
 import { DealsTab } from './DealsTab';
 import { TaskList } from './TaskList';
@@ -9,6 +10,7 @@ import { LinkList } from './LinkList';
 import { HistoriqueTab } from './HistoriqueTab';
 import { ContactForm } from '@/components/molecules/ContactForm';
 import { TransferDialog } from '@/components/molecules/TransferDialog';
+import { ArchiveContactDialog } from '@/components/molecules/ArchiveContactDialog';
 import { cn } from '@/lib/cn';
 import {
   contactDisplayName,
@@ -24,11 +26,13 @@ const TABS = ['Deals', 'Tâches', 'Rappels', 'Liens', 'Historique'] as const;
 type Tab = (typeof TABS)[number];
 
 export function ContactHub({ contactId }: { contactId: string }) {
+  const router = useRouter();
   const [contact, setContact] = useState<ContactStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<Tab>('Deals');
   const [editing, setEditing] = useState(false);
   const [transferOpen, setTransferOpen] = useState(false);
+  const [archiveOpen, setArchiveOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
@@ -70,6 +74,7 @@ export function ContactHub({ contactId }: { contactId: string }) {
         contact={contact}
         onEdit={() => setEditing(true)}
         onTransfer={() => setTransferOpen(true)}
+        onArchive={() => setArchiveOpen(true)}
       />
 
       <div>
@@ -119,6 +124,19 @@ export function ContactHub({ contactId }: { contactId: string }) {
           onDone={() => {
             setTransferOpen(false);
             void reload();
+          }}
+        />
+      )}
+
+      {archiveOpen && (
+        <ArchiveContactDialog
+          contactId={contact.id}
+          contactName={contactDisplayName(contact)}
+          onClose={() => setArchiveOpen(false)}
+          onArchived={() => {
+            setArchiveOpen(false);
+            router.push('/contacts');
+            router.refresh();
           }}
         />
       )}

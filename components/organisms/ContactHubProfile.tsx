@@ -16,6 +16,7 @@ interface ContactHubProfileProps {
   contact: ContactStatus;
   onEdit: () => void;
   onTransfer: () => void;
+  onArchive: () => void;
 }
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
@@ -38,7 +39,7 @@ function Line({ icon, value }: { icon: LucideIcon; value: string | null }) {
   );
 }
 
-export function ContactHubProfile({ contact, onEdit, onTransfer }: ContactHubProfileProps) {
+export function ContactHubProfile({ contact, onEdit, onTransfer, onArchive }: ContactHubProfileProps) {
   const canEdit = useCanEdit(contact.ownerId);
   const { profiles } = useProfiles();
   const owner = profiles[contact.ownerId];
@@ -85,8 +86,7 @@ export function ContactHubProfile({ contact, onEdit, onTransfer }: ContactHubPro
           <Button size="sm" variant="secondary" onClick={onTransfer}>
             Transférer
           </Button>
-          {/* Archiver is wired in plan 1E; disabled stub for now. */}
-          <Button size="sm" variant="secondary" disabled title="Bientôt (plan 1E)">
+          <Button size="sm" variant="danger-outline" onClick={onArchive}>
             Archiver
           </Button>
         </div>

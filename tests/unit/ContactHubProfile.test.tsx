@@ -20,12 +20,14 @@ const contact: ContactStatus = {
   statut: 'Client',
 };
 
+const noop = () => {};
+
 describe('ContactHubProfile', () => {
   beforeEach(() => (useCanEdit as Mock).mockReset());
 
   it('renders statut, owner and coordonnées', () => {
     (useCanEdit as Mock).mockReturnValue(false);
-    render(<ContactHubProfile contact={contact} onEdit={() => {}} onTransfer={() => {}} />);
+    render(<ContactHubProfile contact={contact} onEdit={noop} onTransfer={noop} onArchive={noop} />);
     expect(screen.getByText('Client')).toBeInTheDocument();
     expect(screen.getByText('Eliah')).toBeInTheDocument();
     expect(screen.getByText('marie@acme.fr')).toBeInTheDocument();
@@ -35,19 +37,22 @@ describe('ContactHubProfile', () => {
     (useCanEdit as Mock).mockReturnValue(true);
     const onEdit = vi.fn();
     const onTransfer = vi.fn();
-    render(<ContactHubProfile contact={contact} onEdit={onEdit} onTransfer={onTransfer} />);
+    const onArchive = vi.fn();
+    render(<ContactHubProfile contact={contact} onEdit={onEdit} onTransfer={onTransfer} onArchive={onArchive} />);
 
     fireEvent.click(screen.getByRole('button', { name: 'Modifier' }));
     fireEvent.click(screen.getByRole('button', { name: 'Transférer' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Archiver' }));
     expect(onEdit).toHaveBeenCalledOnce();
     expect(onTransfer).toHaveBeenCalledOnce();
-    expect(screen.getByRole('button', { name: 'Archiver' })).toBeDisabled();
+    expect(onArchive).toHaveBeenCalledOnce();
   });
 
   it('hides actions when not editable (read-only scope / not owner)', () => {
     (useCanEdit as Mock).mockReturnValue(false);
-    render(<ContactHubProfile contact={contact} onEdit={() => {}} onTransfer={() => {}} />);
+    render(<ContactHubProfile contact={contact} onEdit={noop} onTransfer={noop} onArchive={noop} />);
     expect(screen.queryByRole('button', { name: 'Modifier' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Transférer' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Archiver' })).toBeNull();
   });
 });
