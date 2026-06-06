@@ -277,6 +277,9 @@ create table if not exists public.app_config (
   key text primary key, value text not null
 );
 revoke all on public.app_config from anon, authenticated;  -- service/SQL only
+-- Enable RLS with NO policy: locks the table to service-role / SQL / cron only
+-- (all of which bypass RLS). Defense-in-depth so it is never exposed via the API.
+alter table public.app_config enable row level security;
 
 do $cron$
 begin
