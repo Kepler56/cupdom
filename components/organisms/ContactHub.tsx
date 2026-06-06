@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { ContactHubProfile } from './ContactHubProfile';
+import { DealsTab } from './DealsTab';
 import { ContactForm } from '@/components/molecules/ContactForm';
 import { TransferDialog } from '@/components/molecules/TransferDialog';
 import { ComingSoon } from '@/components/molecules/ComingSoon';
@@ -87,8 +88,12 @@ export function ContactHub({ contactId }: { contactId: string }) {
           ))}
         </div>
 
-        {/* The Deals tab content arrives in plan 1B-5; other tabs in 1C. */}
-        <ComingSoon feature={tab} />
+        {/* Deals tab is live; other tabs (Tâches/Rappels/Liens/Historique) arrive in 1C. */}
+        {tab === 'Deals' ? (
+          <DealsTab contact={contact} onChanged={reload} />
+        ) : (
+          <ComingSoon feature={tab} />
+        )}
       </div>
 
       {editing && (
