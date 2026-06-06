@@ -109,6 +109,20 @@ export async function listContactsWithStatus(): Promise<ContactStatus[]> {
   }));
 }
 
+/** A single contact with its derived statut, or null if not found / not readable. */
+export async function getContactWithStatus(id: string): Promise<ContactStatus | null> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from('contacts_with_status')
+    .select('*')
+    .eq('id', id)
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) return null;
+  const r = data as ContactRow & { statut: Statut };
+  return { ...mapContact(r), statut: r.statut };
+}
+
 /** Insert a contact owned by the current member (RLS enforces owner_id = auth.uid()). */
 export async function createContact(input: ContactInput, ownerId: string): Promise<Contact> {
   const supabase = createClient();

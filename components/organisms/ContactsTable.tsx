@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { Pencil, Trash2 } from 'lucide-react';
 import { Icon } from '@/components/atoms/Icon';
 import { OwnerChip } from '@/components/molecules/OwnerChip';
@@ -33,7 +34,9 @@ function ContactRow({
   return (
     <tr className="border-b border-border last:border-0 hover:bg-canvas">
       <td className="px-3 py-2.5">
-        <div className="font-medium text-text">{contactDisplayName(contact)}</div>
+        <Link href={`/contacts/${contact.id}`} className="font-medium text-text hover:underline">
+          {contactDisplayName(contact)}
+        </Link>
         {contact.role && <div className="text-xs text-text-muted">{contact.role}</div>}
       </td>
       <td className="px-3 py-2.5 text-text-body">{contact.company ?? '—'}</td>
