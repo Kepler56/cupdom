@@ -100,3 +100,45 @@ export interface HistoryEntry {
   summary: string | null;
   createdAt: string;
 }
+
+// ── Tasks (Spec 1C §5.6) ────────────────────────────────────────────────────
+export interface Task {
+  id: string;
+  contactId: string;
+  label: string;
+  dueDate: string | null; // ISO date (yyyy-mm-dd); échéance, optional
+  doneAt: string | null; // CANONICAL: null = à faire; timestamp = fait (reopen → null)
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** Task joined with its parent contact, for the cross-contact Tâches page. */
+export interface OwnerTask extends Task {
+  ownerId: string;
+  company: string | null;
+}
+
+// ── Reminders (Spec 1C §5.7) ────────────────────────────────────────────────
+export interface Reminder {
+  id: string;
+  contactId: string;
+  remindOn: string; // ISO date (yyyy-mm-dd); a contact may have many
+  note: string | null;
+  doneAt: string | null; // CANONICAL: null = en attente; timestamp = traité (reopen → null)
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface OwnerReminder extends Reminder {
+  ownerId: string;
+  company: string | null;
+}
+
+// ── Links (Spec 1C §5.8) ────────────────────────────────────────────────────
+export interface ContactLink {
+  id: string;
+  contactId: string;
+  label: string;
+  url: string; // safe scheme only (http/https/mailto/tel), validated in the app
+  createdAt: string;
+}
