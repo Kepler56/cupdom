@@ -43,4 +43,12 @@ describe("Avatar", () => {
     render(<Avatar name="Test User" size="lg" />);
     expect(screen.getByLabelText("Test User")).toHaveClass("w-12", "h-12");
   });
+
+  it("renders without crashing when name is empty", () => {
+    expect(() => render(<Avatar name="" />)).not.toThrow();
+  });
+
+  it("renders without crashing when name is whitespace only", () => {
+    expect(() => render(<Avatar name="   " />)).not.toThrow();
+  });
 });

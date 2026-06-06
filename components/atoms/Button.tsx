@@ -1,4 +1,5 @@
 import React from "react";
+import { cn } from "@/lib/cn";
 
 type ButtonVariant = "primary" | "secondary" | "danger-outline";
 type ButtonSize = "sm" | "md";
@@ -34,16 +35,14 @@ export function Button({
   return (
     <button
       disabled={disabled}
-      className={[
+      className={cn(
         "inline-flex items-center justify-center gap-2 font-medium rounded-input transition-colors cursor-pointer",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-primary",
         variantClasses[variant],
         sizeClasses[size],
-        disabled ? "opacity-40 cursor-not-allowed pointer-events-none" : "",
+        disabled && "opacity-40 cursor-not-allowed pointer-events-none",
         className,
-      ]
-        .filter(Boolean)
-        .join(" ")}
+      )}
       {...props}
     >
       {children}

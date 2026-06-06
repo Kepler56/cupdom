@@ -1,4 +1,5 @@
 import React from "react";
+import { cn } from "@/lib/cn";
 
 /** Stable palette derived from the first character of the name */
 const PALETTE = [
@@ -13,12 +14,15 @@ const PALETTE = [
 ];
 
 function colorFor(name: string) {
-  const idx = (name.charCodeAt(0) ?? 0) % PALETTE.length;
+  const code = name.trim().charCodeAt(0);
+  const idx = Number.isNaN(code) ? 0 : code % PALETTE.length;
   return PALETTE[idx];
 }
 
 function initials(name: string) {
-  const parts = name.trim().split(/\s+/);
+  const trimmed = name.trim();
+  if (!trimmed) return "?";
+  const parts = trimmed.split(/\s+/);
   if (parts.length >= 2) {
     return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
   }
@@ -46,13 +50,11 @@ export function Avatar({ name, size = "md", className = "" }: AvatarProps) {
   return (
     <span
       aria-label={name}
-      className={[
+      className={cn(
         "inline-flex items-center justify-center rounded-full font-semibold select-none shrink-0",
         sizeClasses[size],
         className,
-      ]
-        .filter(Boolean)
-        .join(" ")}
+      )}
       style={{ backgroundColor: bg, color: fg }}
     >
       {abbr}
