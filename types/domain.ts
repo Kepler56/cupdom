@@ -212,3 +212,21 @@ export interface PurgeCountdown {
 export type LifecycleResult =
   | { ok: true }
   | { ok: false; reason: 'not_owner' | 'active_campaign' | 'not_archived' | 'unknown'; message: string };
+
+// ── CSV export (Spec 1F §5.11) ──────────────────────────────────────────────
+export type DatasetId = 'contacts' | 'deals' | 'tasks' | 'campaigns' | 'scan_leads';
+
+/** One CSV column: French header + a pure accessor for the cell (formatting in toCsv). */
+export interface CsvColumn<T> {
+  header: string;
+  value: (row: T) => string | number | null | undefined;
+}
+
+/** A dataset the Exporter can produce. `available: false` => listed but greyed ("bientôt"). */
+export interface ExportDataset<T = unknown> {
+  id: DatasetId;
+  label: string; // FR menu label, e.g. 'Contacts'
+  fileStem: string; // ASCII filename stem, e.g. 'taches'
+  available: boolean;
+  columns: CsvColumn<T>[];
+}
