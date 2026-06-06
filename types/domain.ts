@@ -142,3 +142,52 @@ export interface ContactLink {
   url: string; // safe scheme only (http/https/mailto/tel), validated in the app
   createdAt: string;
 }
+
+// ── Notifications (Spec 1D §5.10) ───────────────────────────────────────────
+export type NotificationType = 'reminder_due' | 'task_overdue' | 'gone_quiet' | 'purge_warning';
+export type GoneQuietLevel = 'souple' | 'a_surveiller' | 'important' | 'urgent';
+
+export type NotificationPayload =
+  | { kind: 'reminder_due'; reminderId: string; note: string | null; remindOn: string; company: string | null }
+  | { kind: 'task_overdue'; taskId: string; label: string; dueDate: string; company: string | null }
+  | { kind: 'gone_quiet'; level: GoneQuietLevel; silentDays: number; lastActivity: string; company: string | null }
+  | { kind: 'purge_warning'; daysLeft: number; purgeAfter: string; company: string | null };
+
+export interface Notification {
+  id: string;
+  recipientId: string;
+  type: NotificationType;
+  contactId: string | null;
+  payload: NotificationPayload;
+  createdAt: string;
+  readAt: string | null; // null = unread
+}
+
+/** Silence thresholds (days) → gone-quiet level (AC-39). Highest-first; first match wins. */
+export const GONE_QUIET_THRESHOLDS: { days: number; level: GoneQuietLevel }[] = [
+  { days: 30, level: 'urgent' },
+  { days: 15, level: 'important' },
+  { days: 7, level: 'a_surveiller' },
+  { days: 2, level: 'souple' },
+];
+
+export const GONE_QUIET_TONE: Record<GoneQuietLevel, 'info' | 'warning' | 'danger'> = {
+  souple: 'info',
+  a_surveiller: 'warning',
+  important: 'warning',
+  urgent: 'danger',
+};
+
+export const GONE_QUIET_LABEL_FR: Record<GoneQuietLevel, string> = {
+  souple: 'Souple',
+  a_surveiller: 'À surveiller',
+  important: 'Important',
+  urgent: 'Urgent',
+};
+
+export const NOTIF_TYPE_LABEL_FR: Record<NotificationType, string> = {
+  reminder_due: 'Rappel à traiter',
+  task_overdue: 'Tâche en retard',
+  gone_quiet: 'Prospect silencieux',
+  purge_warning: 'Suppression imminente',
+};
