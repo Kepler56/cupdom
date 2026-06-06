@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import Link from 'next/link';
 import { Button } from '@/components/atoms/Button';
 import { DealCard } from '@/components/molecules/DealCard';
 import { DealForm } from '@/components/molecules/DealForm';
@@ -103,10 +104,13 @@ export function DealsTab({ contact, onChanged }: DealsTabProps) {
         </div>
       )}
 
-      {/* Campaigns nest under a deal — built in Spec 2. */}
-      <div className="rounded-card border border-dashed border-border-strong p-4 text-center text-sm text-text-muted">
-        Campagnes — à venir (Spec 2)
-      </div>
+      {/* Campaigns nest under a deal — managed on the Campagnes page (Spec 2A). */}
+      <Link
+        href="/campagnes"
+        className="block rounded-card border border-dashed border-border-strong p-4 text-center text-sm text-text-muted hover:border-primary hover:text-primary"
+      >
+        Gérer les campagnes →
+      </Link>
 
       {formOpen && (
         <DealForm

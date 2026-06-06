@@ -59,6 +59,31 @@ export function rollupScans(slug: string, rows: ScanLite[]): CampaignStats {
   };
 }
 
+/** Headline totals across a set of campaigns (per-campaign uniques summed). */
+export interface HeadlineTotals {
+  totalScans: number;
+  uniquesPerDay: number;
+  bots: number;
+  activeScans: number;
+  termineeScans: number;
+  leads: number;
+}
+
+/** Sum a list of per-campaign stats for the list-page headline strip (AC-25). */
+export function sumStats(list: CampaignStats[]): HeadlineTotals {
+  return list.reduce<HeadlineTotals>(
+    (acc, s) => ({
+      totalScans: acc.totalScans + s.totalScans,
+      uniquesPerDay: acc.uniquesPerDay + s.uniquesPerDay,
+      bots: acc.bots + s.bots,
+      activeScans: acc.activeScans + s.activeScans,
+      termineeScans: acc.termineeScans + s.termineeScans,
+      leads: acc.leads + s.leads,
+    }),
+    { totalScans: 0, uniquesPerDay: 0, bots: 0, activeScans: 0, termineeScans: 0, leads: 0 },
+  );
+}
+
 type ScanRow = { campaign_slug: string; is_bot: boolean | null; visitor_hash: string | null; campaign_state_at_scan: CampaignState | null };
 
 /** Per-slug stats for the given campaigns (single grouped read; slugs with no scans → emptyStats). */
