@@ -6,6 +6,7 @@ import { Input } from '@/components/atoms/Input';
 import { ContactsTable } from '@/components/organisms/ContactsTable';
 import { ArchivedContactsPanel } from '@/components/organisms/ArchivedContactsPanel';
 import { ContactForm } from '@/components/molecules/ContactForm';
+import { ExportButton } from '@/components/molecules/ExportButton';
 import { cn } from '@/lib/cn';
 import { useScope, useScopeFilter } from '@/lib/scope';
 import { useProfiles } from '@/lib/profiles';
@@ -101,6 +102,9 @@ export default function ContactsPage() {
   const tabClass = (active: boolean) =>
     cn('px-3 py-1.5 text-sm', active ? 'border-b-2 border-primary font-medium text-text' : 'text-text-muted hover:text-text');
 
+  // Contacts export over the currently visible rows (ContactStatus and ArchivedContact both extend Contact).
+  const exportRows: Contact[] = view === 'actifs' ? visible : visibleArchived;
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-4">
@@ -122,16 +126,19 @@ export default function ContactsPage() {
             />
           </div>
         </div>
-        {canCreate && (
-          <Button
-            onClick={() => {
-              setEditing(null);
-              setFormOpen(true);
-            }}
-          >
-            + Nouveau contact
-          </Button>
-        )}
+        <div className="flex items-center gap-2">
+          <ExportButton datasetId="contacts" rows={exportRows} />
+          {canCreate && (
+            <Button
+              onClick={() => {
+                setEditing(null);
+                setFormOpen(true);
+              }}
+            >
+              + Nouveau contact
+            </Button>
+          )}
+        </div>
       </div>
 
       {loading ? (
