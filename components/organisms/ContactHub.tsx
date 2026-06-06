@@ -3,9 +3,12 @@
 import { useCallback, useEffect, useState } from 'react';
 import { ContactHubProfile } from './ContactHubProfile';
 import { DealsTab } from './DealsTab';
+import { TaskList } from './TaskList';
+import { ReminderList } from './ReminderList';
+import { LinkList } from './LinkList';
+import { HistoriqueTab } from './HistoriqueTab';
 import { ContactForm } from '@/components/molecules/ContactForm';
 import { TransferDialog } from '@/components/molecules/TransferDialog';
-import { ComingSoon } from '@/components/molecules/ComingSoon';
 import { cn } from '@/lib/cn';
 import {
   contactDisplayName,
@@ -88,12 +91,11 @@ export function ContactHub({ contactId }: { contactId: string }) {
           ))}
         </div>
 
-        {/* Deals tab is live; other tabs (Tâches/Rappels/Liens/Historique) arrive in 1C. */}
-        {tab === 'Deals' ? (
-          <DealsTab contact={contact} onChanged={reload} />
-        ) : (
-          <ComingSoon feature={tab} />
-        )}
+        {tab === 'Deals' && <DealsTab contact={contact} onChanged={reload} />}
+        {tab === 'Tâches' && <TaskList contact={contact} />}
+        {tab === 'Rappels' && <ReminderList contact={contact} />}
+        {tab === 'Liens' && <LinkList contact={contact} />}
+        {tab === 'Historique' && <HistoriqueTab contact={contact} />}
       </div>
 
       {editing && (
