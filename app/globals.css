@@ -1,0 +1,59 @@
+@import "tailwindcss";
+
+/* ── Design tokens ───────────────────────────────────────── */
+:root {
+  --canvas: #f7f7f8;
+  --surface: #ffffff;
+  --border: #ececee;
+  --border-strong: #e4e4e7;
+  --text: #18181b;
+  --text-body: #3f3f46;
+  --text-muted: #71717a;
+  --text-faint: #a1a1aa;
+  --primary: #18181b;
+  --primary-contrast: #ffffff;
+  --success-bg: #ecfdf3;
+  --success-fg: #067647;
+  --danger-bg: #fef3f2;
+  --danger-fg: #b42318;
+  --warning-bg: #fffaeb;
+  --warning-fg: #b54708;
+  --info-bg: #eff8ff;
+  --info-fg: #175cd3;
+  --radius: 12px;
+  --radius-sm: 8px;
+}
+
+/* ── Tailwind v4 @theme — expose tokens as utilities ────── */
+@theme inline {
+  --color-canvas: var(--canvas);
+  --color-surface: var(--surface);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-text: var(--text);
+  --color-text-body: var(--text-body);
+  --color-text-muted: var(--text-muted);
+  --color-text-faint: var(--text-faint);
+  --color-primary: var(--primary);
+  --color-primary-contrast: var(--primary-contrast);
+  --color-success-bg: var(--success-bg);
+  --color-success-fg: var(--success-fg);
+  --color-danger-bg: var(--danger-bg);
+  --color-danger-fg: var(--danger-fg);
+  --color-warning-bg: var(--warning-bg);
+  --color-warning-fg: var(--warning-fg);
+  --color-info-bg: var(--info-bg);
+  --color-info-fg: var(--info-fg);
+  --radius-card: var(--radius);
+  --radius-input: var(--radius-sm);
+  --font-sans: var(--font-manrope), system-ui, sans-serif;
+}
+
+/* ── Base body styles ────────────────────────────────────── */
+body {
+  background-color: var(--canvas);
+  color: var(--text-body);
+  font-family: var(--font-manrope), system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}

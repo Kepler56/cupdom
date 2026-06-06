@@ -14,6 +14,12 @@ lemlist_*.py
 # ── Notes / docs ──────────────────────────────────────────
 docs/
 *.md
+inspirations/
+
+# ── Claude Code local config (never push) ─────────────────
+.claude/
+CLAUDE.md
+.superpowers/
 
 # ── Tests ─────────────────────────────────────────────────
 *.test.mjs
@@ -22,3 +28,14 @@ docs/
 .DS_Store
 Thumbs.db
 *.log
+
+# ── Next.js build output ──────────────────────────────────
+.next/
+out/
+
+# ── Node dependencies ─────────────────────────────────────
+node_modules/
+
+# ── TypeScript build info ─────────────────────────────────
+*.tsbuildinfo
+next-env.d.ts
