@@ -197,28 +197,26 @@ revoke all on function public.cleanup_completed_reminders() from public, anon, a
 --    unschedule any existing job of the same name first, ignoring "not found".
 --    Runs daily at 03:10 UTC (off-peak; after any digest job that 1D may add).
 -- ------------------------------------------------------------
-do $$
+-- Guarded so the migration applies even when pg_cron is NOT yet enabled (the
+-- `cron` schema is absent until then — otherwise a bare cron.schedule() errors and,
+-- because the SQL editor runs the whole script in one transaction, rolls EVERYTHING
+-- back). When pg_cron IS enabled, the two daily jobs are (re)scheduled idempotently.
+-- If it is not, scheduling is skipped with a NOTICE — enable pg_cron
+-- (Dashboard -> Database -> Extensions -> "pg_cron") and re-run to activate cleanup.
+do $cron$
 begin
-  perform cron.unschedule('cupdom_cleanup_completed_tasks');
-exception when others then null;
-end $$;
-do $$
-begin
-  perform cron.unschedule('cupdom_cleanup_completed_reminders');
-exception when others then null;
-end $$;
+  if not exists (select 1 from pg_namespace where nspname = 'cron') then
+    raise notice 'pg_cron not enabled — skipping cleanup schedule. Enable the pg_cron extension and re-run this migration to activate the 90-day cleanup.';
+    return;
+  end if;
 
-select cron.schedule(
-  'cupdom_cleanup_completed_tasks',
-  '10 3 * * *',
-  $$select public.cleanup_completed_tasks();$$
-);
+  begin perform cron.unschedule('cupdom_cleanup_completed_tasks');     exception when others then null; end;
+  begin perform cron.unschedule('cupdom_cleanup_completed_reminders'); exception when others then null; end;
 
-select cron.schedule(
-  'cupdom_cleanup_completed_reminders',
-  '15 3 * * *',
-  $$select public.cleanup_completed_reminders();$$
-);
+  perform cron.schedule('cupdom_cleanup_completed_tasks',     '10 3 * * *', $$select public.cleanup_completed_tasks();$$);
+  perform cron.schedule('cupdom_cleanup_completed_reminders', '15 3 * * *', $$select public.cleanup_completed_reminders();$$);
+end
+$cron$;
 
 -- ============================================================
 -- VERIFICATION (read results below the query)
@@ -231,6 +229,8 @@ where schemaname = 'public' and tablename in ('tasks','reminders','contact_links
 select tablename, policyname, cmd from pg_policies
 where tablename in ('tasks','reminders','contact_links') order by tablename, cmd;
 
--- Expected: the two cron jobs are registered and active.
-select jobname, schedule, active from cron.job
-where jobname in ('cupdom_cleanup_completed_tasks','cupdom_cleanup_completed_reminders');
+-- Expected (ONLY after pg_cron is enabled): the two cron jobs are registered and active.
+-- This reads the `cron` schema, so run it SEPARATELY once pg_cron is on (it errors if
+-- the cron schema is absent):
+--   select jobname, schedule, active from cron.job
+--   where jobname in ('cupdom_cleanup_completed_tasks','cupdom_cleanup_completed_reminders');
