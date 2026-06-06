@@ -56,3 +56,47 @@ export type Scope =
   | { kind: 'me' }
   | { kind: 'user'; userId: string }
   | { kind: 'all' };
+
+// ── Deals (Spec 1B §3.3) ────────────────────────────────────────────────────
+export type DealStage = 'QUALIFICATION' | 'PROPOSITION' | 'NÉGOCIATION' | 'GAGNÉ' | 'PERDU';
+
+/** Source of truth for the SQL CHECK list, the StageSelect, and the Pipeline columns (order matters). */
+export const DEAL_STAGES: readonly DealStage[] = [
+  'QUALIFICATION', 'PROPOSITION', 'NÉGOCIATION', 'GAGNÉ', 'PERDU',
+] as const;
+
+/** Terminal/closed stages (no further pipeline movement). */
+export const CLOSED_STAGES: readonly DealStage[] = ['GAGNÉ', 'PERDU'] as const;
+
+export interface Deal {
+  id: string;
+  contactId: string;
+  title: string | null;
+  stage: DealStage;
+  valueEur: number | null;
+  expectedClose: string | null; // ISO date (yyyy-mm-dd)
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ── Derived statut (Spec 1B §3.4) ───────────────────────────────────────────
+export type Statut = 'Prospect' | 'En cours' | 'Client' | 'Perdu';
+export const STATUTS: readonly Statut[] = ['Prospect', 'En cours', 'Client', 'Perdu'] as const;
+
+/** Contact joined with its derived statut (shape of public.contacts_with_status). */
+export interface ContactStatus extends Contact {
+  statut: Statut;
+}
+
+// ── Activity timeline (Spec 1B §5.8 / built out in 1C) ──────────────────────
+export type HistoryKind =
+  | 'deal_stage' | 'transfer' | 'contact_edit' | 'task' | 'reminder' | 'link';
+
+export interface HistoryEntry {
+  id: string;
+  contactId: string;
+  actorId: string | null;
+  kind: HistoryKind;
+  summary: string | null;
+  createdAt: string;
+}
