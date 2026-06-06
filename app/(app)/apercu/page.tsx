@@ -1,6 +1,7 @@
 'use client';
 
 import { useMember } from '@/lib/profiles';
+import { TodayPanel } from '@/components/organisms/TodayPanel';
 
 const KPIS = ['Contacts actifs', 'Scans (30 j)', 'Leads (30 j)', 'Pipeline (€)'];
 
@@ -22,6 +23,11 @@ export default function ApercuPage() {
           </div>
         ))}
       </div>
+
+      <section>
+        <h2 className="mb-3 text-sm font-semibold text-text">À traiter aujourd&apos;hui</h2>
+        <TodayPanel />
+      </section>
     </div>
   );
 }
