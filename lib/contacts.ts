@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/client';
-import type { CompanySize, Contact, ContactStatus, Sector, Statut } from '@/types/domain';
+import type { ArchivedContact, CompanySize, Contact, ContactStatus, Sector, Statut } from '@/types/domain';
 
 /** Shape of the form fields (empty string = "not set"). */
 export interface ContactInput {
@@ -107,6 +107,20 @@ export async function listContactsWithStatus(): Promise<ContactStatus[]> {
     ...mapContact(r),
     statut: r.statut,
   }));
+}
+
+/** Archived contacts (archived_at not null), soonest-to-purge first. */
+export async function listArchivedContacts(): Promise<ArchivedContact[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from('contacts_with_status')
+    .select('*')
+    .not('archived_at', 'is', null)
+    .order('purge_after', { ascending: true });
+  if (error) throw error;
+  return (data as (ContactRow & { statut: Statut })[] | null ?? [])
+    .filter((r) => r.archived_at && r.purge_after)
+    .map((r) => ({ ...mapContact(r), archivedAt: r.archived_at as string, purgeAfter: r.purge_after as string }));
 }
 
 /** A single contact with its derived statut, or null if not found / not readable. */

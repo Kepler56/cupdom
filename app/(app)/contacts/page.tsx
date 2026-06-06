@@ -4,7 +4,9 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/atoms/Button';
 import { Input } from '@/components/atoms/Input';
 import { ContactsTable } from '@/components/organisms/ContactsTable';
+import { ArchivedContactsPanel } from '@/components/organisms/ArchivedContactsPanel';
 import { ContactForm } from '@/components/molecules/ContactForm';
+import { cn } from '@/lib/cn';
 import { useScope, useScopeFilter } from '@/lib/scope';
 import { useProfiles } from '@/lib/profiles';
 import {
@@ -12,11 +14,14 @@ import {
   contactToInput,
   createContact,
   deleteContact,
+  listArchivedContacts,
   listContactsWithStatus,
   updateContact,
   type ContactInput,
 } from '@/lib/contacts';
-import type { Contact, ContactStatus } from '@/types/domain';
+import type { ArchivedContact, Contact, ContactStatus } from '@/types/domain';
+
+type View = 'actifs' | 'archives';
 
 export default function ContactsPage() {
   const { scope, myId } = useScope();
@@ -24,7 +29,9 @@ export default function ContactsPage() {
   const { profiles } = useProfiles();
 
   const [contacts, setContacts] = useState<ContactStatus[]>([]);
+  const [archived, setArchived] = useState<ArchivedContact[]>([]);
   const [loading, setLoading] = useState(true);
+  const [view, setView] = useState<View>('actifs');
   const [search, setSearch] = useState('');
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Contact | null>(null);
@@ -34,7 +41,9 @@ export default function ContactsPage() {
   const reload = useCallback(async () => {
     setLoading(true);
     try {
-      setContacts(await listContactsWithStatus());
+      const [active, arch] = await Promise.all([listContactsWithStatus(), listArchivedContacts()]);
+      setContacts(active);
+      setArchived(arch);
     } finally {
       setLoading(false);
     }
@@ -44,20 +53,24 @@ export default function ContactsPage() {
     void reload();
   }, [reload]);
 
-  const canCreate = scope.kind === 'me';
+  const canCreate = view === 'actifs' && scope.kind === 'me';
 
-  const visible = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    return contacts
-      .filter((c) => scopeFilter(c.ownerId))
-      .filter(
-        (c) =>
-          !q ||
-          [c.firstName, c.lastName, c.company, c.email].some((v) =>
-            v?.toLowerCase().includes(q),
-          ),
-      );
-  }, [contacts, scopeFilter, search]);
+  const matchesSearch = useCallback(
+    (c: Contact) => {
+      const q = search.trim().toLowerCase();
+      return !q || [c.firstName, c.lastName, c.company, c.email].some((v) => v?.toLowerCase().includes(q));
+    },
+    [search],
+  );
+
+  const visible = useMemo(
+    () => contacts.filter((c) => scopeFilter(c.ownerId)).filter(matchesSearch),
+    [contacts, scopeFilter, matchesSearch],
+  );
+  const visibleArchived = useMemo(
+    () => archived.filter((c) => scopeFilter(c.ownerId)).filter(matchesSearch),
+    [archived, scopeFilter, matchesSearch],
+  );
 
   async function handleSubmit(input: ContactInput) {
     setSubmitting(true);
@@ -85,16 +98,29 @@ export default function ContactsPage() {
     }
   }
 
+  const tabClass = (active: boolean) =>
+    cn('px-3 py-1.5 text-sm', active ? 'border-b-2 border-primary font-medium text-text' : 'text-text-muted hover:text-text');
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-4">
-        <div className="w-full max-w-xs">
-          <Input
-            aria-label="Rechercher un contact"
-            placeholder="Rechercher…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
+        <div className="flex items-center gap-4">
+          <div className="flex border-b border-border">
+            <button type="button" className={tabClass(view === 'actifs')} onClick={() => setView('actifs')}>
+              Actifs
+            </button>
+            <button type="button" className={tabClass(view === 'archives')} onClick={() => setView('archives')}>
+              Archivés
+            </button>
+          </div>
+          <div className="w-56">
+            <Input
+              aria-label="Rechercher un contact"
+              placeholder="Rechercher…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
         </div>
         {canCreate && (
           <Button
@@ -110,7 +136,7 @@ export default function ContactsPage() {
 
       {loading ? (
         <p className="text-sm text-text-muted">Chargement…</p>
-      ) : (
+      ) : view === 'actifs' ? (
         <ContactsTable
           rows={visible}
           profiles={profiles}
@@ -120,6 +146,8 @@ export default function ContactsPage() {
           }}
           onDelete={handleDelete}
         />
+      ) : (
+        <ArchivedContactsPanel contacts={visibleArchived} onRestored={() => void reload()} />
       )}
 
       {formOpen && (
