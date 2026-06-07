@@ -2,9 +2,9 @@ import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 
 /** Paths reachable without a session (everything else under (app) is protected). */
-// '/campagne-terminee' is the public ended/indisponible page an anonymous scanner lands on
-// after a /s/<slug> redirect (Spec 2B) — it must never bounce to /login.
-const PUBLIC_PREFIXES = ['/login', '/set-password', '/auth', '/campagne-terminee'];
+// Public scanner surfaces (Spec 2B/3A): the ended page and the /c/<slug> lead form an anonymous
+// consumer lands on after a /s/<slug> redirect — they must never bounce to /login.
+const PUBLIC_PREFIXES = ['/login', '/set-password', '/auth', '/campagne-terminee', '/c'];
 
 function isPublic(pathname: string): boolean {
   return PUBLIC_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`));
