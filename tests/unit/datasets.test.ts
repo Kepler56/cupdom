@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { EXPORT_DATASETS, getDataset } from '@/lib/export/datasets';
+import { leadCsvColumns } from '@/lib/export/leadsLoaders';
 import { toCsv } from '@/lib/export/toCsv';
 import type { ContactStatus } from '@/types/domain';
 
@@ -13,9 +14,22 @@ describe('export dataset registry', () => {
     );
   });
 
-  it('availability flags: contacts/deals/tasks live; campaigns/scan_leads bientôt', () => {
+  it('availability flags: all five datasets live since Spec 3A (campaigns/scan_leads enabled)', () => {
     const avail = Object.fromEntries(EXPORT_DATASETS.map((d) => [d.id, d.available]));
-    expect(avail).toMatchObject({ contacts: true, deals: true, tasks: true, campaigns: false, scan_leads: false });
+    expect(avail).toMatchObject({ contacts: true, deals: true, tasks: true, campaigns: true, scan_leads: true });
+  });
+
+  it('campaigns header row is the exact FR columns in order', () => {
+    expect(headerOf(toCsv([], getDataset('campaigns').columns))).toBe('Campagne;Contact;Deal;Statut;Scans;Leads;Créé le');
+  });
+
+  it('leadCsvColumns produce the FR lead header and serialise a sample lead', () => {
+    const csv = toCsv(
+      [{ firstName: 'Marie', lastName: 'Curie', email: 'm@x.fr', phone: '0612', firstSeenAt: '2026-06-01T00:00:00Z' }],
+      leadCsvColumns,
+    );
+    expect(headerOf(csv)).toBe('Prénom;Nom;Email;Téléphone;Capturé le');
+    expect(csv.slice(1).split('\r\n')[1].startsWith('Marie;Curie;m@x.fr;0612;')).toBe(true);
   });
 
   it('fileStems are ASCII (Tâches → taches)', () => {

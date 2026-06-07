@@ -16,14 +16,15 @@ const rows: Row[] = [
 describe('ExportButton', () => {
   beforeEach(() => (downloadCsv as Mock).mockClear());
 
-  it('lists all five datasets; Campagnes/Stats are disabled with "bientôt"', () => {
+  it('lists all five datasets; ones not in this mount are disabled (no download on click)', () => {
     render(<ExportButton datasetId="contacts" rows={rows} />);
     fireEvent.click(screen.getByRole('button', { name: /Exporter/ }));
     for (const label of ['Contacts', 'Deals', 'Tâches', 'Campagnes', 'Stats scans-leads']) {
       expect(screen.getByText(label)).toBeInTheDocument();
     }
-    expect(screen.getAllByText('bientôt')).toHaveLength(2);
-    fireEvent.click(screen.getByText('Campagnes'));
+    // Since Spec 3A every dataset is available; entries not in this mount's allowed set stay disabled.
+    expect(screen.queryByText('bientôt')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByText('Campagnes')); // not in allowed set → disabled
     expect(downloadCsv).not.toHaveBeenCalled();
   });
 

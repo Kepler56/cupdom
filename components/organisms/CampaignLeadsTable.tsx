@@ -6,21 +6,15 @@ import { Button } from '@/components/atoms/Button';
 import { Icon } from '@/components/atoms/Icon';
 import { toCsv } from '@/lib/export/toCsv';
 import { downloadCsv } from '@/lib/export/downloadCsv';
+import { leadCsvColumns } from '@/lib/export/leadsLoaders';
 import { listCampaignLeads } from '@/lib/leads';
-import type { CsvColumn, Lead } from '@/types/domain';
+import type { Lead } from '@/types/domain';
 
 const fmtDate = (v: string | null): string => (v ? new Intl.DateTimeFormat('fr-FR').format(new Date(v)) : '');
 
 // Per-campaign lead hand-off CSV (Spec 3A AC-12) — FR headers, reuses 1F toCsv/downloadCsv.
 // Export is read-only and allowed in EVERY scope (not useCanEdit-gated, per 1F §4) so a
 // colleague/Tous viewer can still hand a CSV to the sponsor.
-const leadCsvColumns: CsvColumn<Lead>[] = [
-  { header: 'Prénom', value: (l) => l.firstName },
-  { header: 'Nom', value: (l) => l.lastName },
-  { header: 'Email', value: (l) => l.email },
-  { header: 'Téléphone', value: (l) => l.phone },
-  { header: 'Capturé le', value: (l) => fmtDate(l.firstSeenAt) },
-];
 
 interface CampaignLeadsTableProps {
   slug: string;

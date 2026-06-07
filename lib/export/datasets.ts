@@ -1,5 +1,6 @@
 import type { ContactStatus, CsvColumn, DatasetId, ExportDataset, OwnerTask } from '@/types/domain';
 import type { ScopeDeal } from '@/lib/deals';
+import type { CampaignExportRow, ScanLeadRow } from '@/lib/export/leadsLoaders';
 
 type NameOf = (ownerId: string) => string;
 
@@ -67,21 +68,40 @@ function tasksDataset(nameOf: NameOf): ExportDataset {
   };
 }
 
-// Listed but disabled until Spec 2/3 supply the data — only the loaders + `available`
-// flag change at cutover (headers declared now). Accessors are stubs (never called).
+// Live since Spec 3A (migration 0007 supplies leads + the funnel). Loaders/row types live in
+// lib/export/leadsLoaders.ts; the registry shape stays owned by 1F.
 function campaignsDataset(): ExportDataset {
+  const c = (r: unknown) => r as CampaignExportRow;
   return {
-    id: 'campaigns', label: 'Campagnes', fileStem: 'campagnes', available: false,
-    columns: ['Campagne', 'Contact', 'Deal', 'Statut', 'Scans', 'Leads', 'Créé le'].map((h) => col(h, () => '')),
+    id: 'campaigns', label: 'Campagnes', fileStem: 'campagnes', available: true,
+    columns: [
+      col('Campagne', (r) => c(r).name),
+      col('Contact', (r) => c(r).contactName),
+      col('Deal', (r) => c(r).dealTitle),
+      col('Statut', (r) => c(r).statut),
+      col('Scans', (r) => c(r).scans),
+      col('Leads', (r) => c(r).leads),
+      col('Créé le', (r) => fmtDate(c(r).createdAt)),
+    ],
   };
 }
 
+const pct = (v: number): string => `${(v * 100).toFixed(1).replace('.', ',')} %`;
+
 function scanLeadsDataset(): ExportDataset {
+  const s = (r: unknown) => r as ScanLeadRow;
+  // Ville/Appareil/Période are per-scan breakdowns (Spec 4 analytics) — blank in this aggregate.
   return {
-    id: 'scan_leads', label: 'Stats scans-leads', fileStem: 'stats-scans-leads', available: false,
-    columns: ['Campagne', 'Scans', 'Leads', 'Taux de conversion', 'Ville', 'Appareil', 'Période'].map((h) =>
-      col(h, () => ''),
-    ),
+    id: 'scan_leads', label: 'Stats scans-leads', fileStem: 'stats-scans-leads', available: true,
+    columns: [
+      col('Campagne', (r) => s(r).name),
+      col('Scans', (r) => s(r).scans),
+      col('Leads', (r) => s(r).leads),
+      col('Taux de conversion', (r) => pct(s(r).conversionRate)),
+      col('Ville', () => ''),
+      col('Appareil', () => ''),
+      col('Période', () => ''),
+    ],
   };
 }
 
