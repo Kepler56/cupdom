@@ -92,6 +92,22 @@ export default function TachesPage() {
 
   if (loading) return <p className="text-sm text-text-muted">Chargement…</p>;
 
+  const total = groups.overdue.length + groups.upcoming.length + groups.done.length;
+  if (total === 0) {
+    return (
+      <div className="rounded-card border border-dashed border-border-strong bg-surface p-10 text-center">
+        <p className="text-sm text-text-muted">Aucune tâche.</p>
+        <p className="mt-1 text-sm text-text-faint">
+          Les tâches se créent depuis une fiche contact. Ouvrez un{' '}
+          <Link href="/contacts" className="text-primary underline">
+            contact
+          </Link>{' '}
+          puis l&apos;onglet <strong>Tâches</strong> pour en ajouter — elles seront regroupées ici.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <Group title="En retard" count={groups.overdue.length} tasks={groups.overdue} onChanged={reload} />

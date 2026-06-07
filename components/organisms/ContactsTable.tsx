@@ -1,7 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { Pencil, Trash2 } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { ChevronRight, Pencil, Trash2 } from 'lucide-react';
 import { Icon } from '@/components/atoms/Icon';
 import { OwnerChip } from '@/components/molecules/OwnerChip';
 import { StatutBadge } from '@/components/molecules/StatutBadge';
@@ -30,11 +31,18 @@ function ContactRow({
   onDelete: (c: Contact) => void;
 }) {
   const canEdit = useCanEdit(contact.ownerId);
+  const router = useRouter();
+  const href = `/contacts/${contact.id}`;
 
+  // The whole row opens the contact hub (where deals / tâches / rappels are created).
+  // The Nom stays a real <Link> for keyboard access; inner buttons stop propagation.
   return (
-    <tr className="border-b border-border last:border-0 hover:bg-canvas">
+    <tr
+      className="cursor-pointer border-b border-border last:border-0 hover:bg-canvas"
+      onClick={() => router.push(href)}
+    >
       <td className="px-3 py-2.5">
-        <Link href={`/contacts/${contact.id}`} className="font-medium text-text hover:underline">
+        <Link href={href} className="font-medium text-text hover:underline" onClick={(e) => e.stopPropagation()}>
           {contactDisplayName(contact)}
         </Link>
         {contact.role && <div className="text-xs text-text-muted">{contact.role}</div>}
@@ -49,26 +57,35 @@ function ContactRow({
       </td>
       <td className="px-3 py-2.5 text-text-muted">{fmtDate(contact.updatedAt)}</td>
       <td className="px-3 py-2.5 text-right">
-        {canEdit && (
-          <div className="flex justify-end gap-1">
-            <button
-              type="button"
-              aria-label={`Modifier ${contactDisplayName(contact)}`}
-              onClick={() => onEdit(contact)}
-              className="rounded-input p-1.5 text-text-muted hover:bg-canvas hover:text-text"
-            >
-              <Icon icon={Pencil} size={16} />
-            </button>
-            <button
-              type="button"
-              aria-label={`Supprimer ${contactDisplayName(contact)}`}
-              onClick={() => onDelete(contact)}
-              className="rounded-input p-1.5 text-text-muted hover:bg-danger-bg hover:text-danger-fg"
-            >
-              <Icon icon={Trash2} size={16} />
-            </button>
-          </div>
-        )}
+        <div className="flex items-center justify-end gap-1">
+          {canEdit && (
+            <>
+              <button
+                type="button"
+                aria-label={`Modifier ${contactDisplayName(contact)}`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onEdit(contact);
+                }}
+                className="rounded-input p-1.5 text-text-muted hover:bg-canvas hover:text-text"
+              >
+                <Icon icon={Pencil} size={16} />
+              </button>
+              <button
+                type="button"
+                aria-label={`Supprimer ${contactDisplayName(contact)}`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDelete(contact);
+                }}
+                className="rounded-input p-1.5 text-text-muted hover:bg-danger-bg hover:text-danger-fg"
+              >
+                <Icon icon={Trash2} size={16} />
+              </button>
+            </>
+          )}
+          <Icon icon={ChevronRight} size={16} className="text-text-faint" />
+        </div>
       </td>
     </tr>
   );
