@@ -1,6 +1,18 @@
-# Netlify configuration for Cupdom CRM (Next.js app; Netlify auto-detects the Next build).
-# Security headers applied to every response — the REAL CSP enforcement.
+# Netlify configuration for Cupdom CRM (Next.js app).
 
+# Build the Next.js app (pnpm is auto-detected from pnpm-lock.yaml). The Next runtime plugin
+# wires up routing + serverless rendering and publishes the `.next` output.
+[build]
+  command = "pnpm build"
+  publish = ".next"
+
+[build.environment]
+  NODE_VERSION = "20"
+
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
+
+# Security headers applied to every response — the REAL CSP enforcement.
 [[headers]]
   for = "/*"
   [headers.values]
