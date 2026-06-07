@@ -12,12 +12,12 @@ interface CampaignsListProps {
 
 function Headline({ rows }: { rows: CampaignRowVM[] }) {
   const t = sumStats(rows.map((r) => r.stats));
-  const items: { label: string; value: ReactNode }[] = [
-    { label: 'Scans', value: t.totalScans },
-    { label: 'Uniques/jour', value: t.uniquesPerDay },
-    { label: 'Bots', value: t.bots },
+  const items: { label: string; value: ReactNode; hint?: string }[] = [
+    { label: 'Scans', value: t.totalScans, hint: 'Hors bots' },
+    { label: 'Uniques / jour', value: t.uniquesPerDay },
+    { label: 'Bots', value: t.bots, hint: 'Exclus du total' },
     {
-      label: 'Active / Terminée',
+      label: 'Scans Active / Terminée',
       value: (
         <>
           <span className="text-success-fg">{t.activeScans}</span>
@@ -29,11 +29,12 @@ function Headline({ rows }: { rows: CampaignRowVM[] }) {
     { label: 'Leads', value: t.leads },
   ];
   return (
-    <div className="flex flex-wrap gap-6 rounded-card border border-border bg-surface px-5 py-4">
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
       {items.map((it) => (
-        <div key={it.label} className="flex flex-col">
-          <span className="text-lg font-semibold tabular-nums text-text">{it.value}</span>
-          <span className="text-xs text-text-muted">{it.label}</span>
+        <div key={it.label} className="rounded-card border border-border bg-surface px-4 py-3">
+          <p className="text-xs text-text-muted">{it.label}</p>
+          <p className="mt-1 text-2xl font-semibold tabular-nums text-text">{it.value}</p>
+          {it.hint && <p className="mt-0.5 text-xs text-text-faint">{it.hint}</p>}
         </div>
       ))}
     </div>
