@@ -32,7 +32,7 @@ describe('CampaignLeadsTable', () => {
   });
 
   it('renders one row per lead with Nom/Email/Téléphone/Capturé le (fr-FR date)', async () => {
-    render(<CampaignLeadsTable slug="abcd23" />);
+    render(<CampaignLeadsTable slug="abcd23" canEdit={false} />);
     expect(await screen.findByText('Marie Curie')).toBeInTheDocument();
     expect(screen.getByText('marie@x.fr')).toBeInTheDocument();
     expect(screen.getByText('0612345678')).toBeInTheDocument();
@@ -40,7 +40,7 @@ describe('CampaignLeadsTable', () => {
   });
 
   it('"Exporter les leads" downloads a BOM CSV with the FR header row', async () => {
-    render(<CampaignLeadsTable slug="abcd23" />);
+    render(<CampaignLeadsTable slug="abcd23" canEdit={false} />);
     await screen.findByText('Marie Curie');
     fireEvent.click(screen.getByRole('button', { name: /Exporter les leads/ }));
 
@@ -53,7 +53,7 @@ describe('CampaignLeadsTable', () => {
 
   it('empty leads → export button disabled', async () => {
     (listCampaignLeads as Mock).mockResolvedValue([]);
-    render(<CampaignLeadsTable slug="abcd23" />);
+    render(<CampaignLeadsTable slug="abcd23" canEdit={false} />);
     await screen.findByText('Aucun lead capturé.');
     expect(screen.getByRole('button', { name: /Exporter les leads/ })).toBeDisabled();
   });

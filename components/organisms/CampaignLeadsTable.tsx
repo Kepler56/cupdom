@@ -1,29 +1,32 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Download } from 'lucide-react';
+import { Download, Trash2 } from 'lucide-react';
 import { Button } from '@/components/atoms/Button';
 import { Icon } from '@/components/atoms/Icon';
 import { toCsv } from '@/lib/export/toCsv';
 import { downloadCsv } from '@/lib/export/downloadCsv';
 import { leadCsvColumns } from '@/lib/export/leadsLoaders';
 import { listCampaignLeads } from '@/lib/leads';
+import { eraseLead } from '@/lib/leads/erase';
 import type { Lead } from '@/types/domain';
 
 const fmtDate = (v: string | null): string => (v ? new Intl.DateTimeFormat('fr-FR').format(new Date(v)) : '');
-
-// Per-campaign lead hand-off CSV (Spec 3A AC-12) — FR headers, reuses 1F toCsv/downloadCsv.
-// Export is read-only and allowed in EVERY scope (not useCanEdit-gated, per 1F §4) so a
-// colleague/Tous viewer can still hand a CSV to the sponsor.
+const isAnonymised = (l: Lead): boolean => !l.firstName && !l.lastName && !l.email && !l.phone;
 
 interface CampaignLeadsTableProps {
   slug: string;
+  /** The campaign owner (scope Moi) may erase lead PII (RGPD, AC-15); read-only off-scope (AC-13). */
+  canEdit: boolean;
 }
 
-/** Owner-visible leads list on a campaign (read-only for everyone — leads are not member-editable). */
-export function CampaignLeadsTable({ slug }: CampaignLeadsTableProps) {
+/** Owner-visible leads list on a campaign (read-only for everyone except the RGPD erase action). */
+export function CampaignLeadsTable({ slug, canEdit }: CampaignLeadsTableProps) {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(true);
+  const [confirm, setConfirm] = useState<Lead | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -48,6 +51,22 @@ export function CampaignLeadsTable({ slug }: CampaignLeadsTableProps) {
     downloadCsv(`leads_${slug}_${today}.csv`, toCsv(leads, leadCsvColumns));
   }
 
+  async function doErase() {
+    if (!confirm) return;
+    setBusy(true);
+    const res = await eraseLead(confirm.id);
+    setBusy(false);
+    if (res.ok) {
+      setLeads((prev) =>
+        prev.map((l) => (l.id === confirm.id ? { ...l, firstName: null, lastName: null, email: null, phone: null } : l)),
+      );
+      setMsg('Données du lead effacées');
+    } else {
+      setMsg(res.message);
+    }
+    setConfirm(null);
+  }
+
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
@@ -56,6 +75,12 @@ export function CampaignLeadsTable({ slug }: CampaignLeadsTableProps) {
           <Icon icon={Download} size={15} /> Exporter les leads
         </Button>
       </div>
+
+      {msg && (
+        <p className="text-xs text-text-muted" role="status">
+          {msg}
+        </p>
+      )}
 
       {loading ? (
         <p className="text-sm text-text-muted">Chargement…</p>
@@ -72,19 +97,67 @@ export function CampaignLeadsTable({ slug }: CampaignLeadsTableProps) {
                 <th className="px-3 py-2 font-medium">Email</th>
                 <th className="px-3 py-2 font-medium">Téléphone</th>
                 <th className="px-3 py-2 font-medium">Capturé le</th>
+                {canEdit && <th className="px-3 py-2" />}
               </tr>
             </thead>
             <tbody>
-              {leads.map((l) => (
-                <tr key={l.id} className="border-b border-border last:border-0">
-                  <td className="px-3 py-2.5 text-text">{`${l.firstName ?? ''} ${l.lastName ?? ''}`.trim() || '—'}</td>
-                  <td className="px-3 py-2.5 text-text-muted">{l.email ?? '—'}</td>
-                  <td className="px-3 py-2.5 text-text-muted">{l.phone ?? '—'}</td>
-                  <td className="px-3 py-2.5 text-text-muted">{fmtDate(l.firstSeenAt)}</td>
-                </tr>
-              ))}
+              {leads.map((l) => {
+                const anon = isAnonymised(l);
+                return (
+                  <tr key={l.id} className="border-b border-border last:border-0">
+                    <td className="px-3 py-2.5 text-text">
+                      {anon ? (
+                        <span className="italic text-text-faint">Lead anonymisé</span>
+                      ) : (
+                        `${l.firstName ?? ''} ${l.lastName ?? ''}`.trim() || '—'
+                      )}
+                    </td>
+                    <td className="px-3 py-2.5 text-text-muted">{l.email ?? '—'}</td>
+                    <td className="px-3 py-2.5 text-text-muted">{l.phone ?? '—'}</td>
+                    <td className="px-3 py-2.5 text-text-muted">{fmtDate(l.firstSeenAt)}</td>
+                    {canEdit && (
+                      <td className="px-3 py-2.5 text-right">
+                        {!anon && (
+                          <button
+                            type="button"
+                            onClick={() => setConfirm(l)}
+                            className="inline-flex items-center gap-1 text-xs text-danger-fg hover:underline"
+                          >
+                            <Icon icon={Trash2} size={13} /> Effacer (RGPD)
+                          </button>
+                        )}
+                      </td>
+                    )}
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {confirm && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Effacer les données du lead"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-text/30 p-4"
+        >
+          <div className="w-full max-w-md rounded-card border border-border bg-surface p-6 shadow-lg">
+            <h3 className="mb-3 text-base font-semibold text-text">Effacer les données personnelles ?</h3>
+            <p className="mb-6 text-sm text-text-muted">
+              Le prénom, le nom, l&apos;email et le téléphone de ce lead seront supprimés définitivement. Les
+              statistiques anonymes (entonnoir) sont conservées.
+            </p>
+            <div className="flex justify-end gap-2">
+              <Button variant="secondary" onClick={() => setConfirm(null)}>
+                Annuler
+              </Button>
+              <Button variant="danger-outline" disabled={busy} onClick={() => void doErase()}>
+                {busy ? 'Effacement…' : 'Effacer'}
+              </Button>
+            </div>
+          </div>
         </div>
       )}
     </div>

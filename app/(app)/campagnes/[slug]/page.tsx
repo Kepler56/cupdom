@@ -51,7 +51,7 @@ export default function CampaignDetailPage() {
       </div>
 
       {/* Spec 4 adds the funnel chart here (over lib/funnel.ts#loadCampaignFunnel). */}
-      <CampaignLeadsTable slug={slug} />
+      <CampaignLeadsTable slug={slug} canEdit={canEdit} />
     </div>
   );
 }
