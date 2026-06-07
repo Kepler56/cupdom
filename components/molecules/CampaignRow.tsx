@@ -146,31 +146,32 @@ export function CampaignRow({ row, onChanged }: CampaignRowProps) {
             )}
           </div>
         </div>
-      </td>
 
-      {qrOpen && <QrDialog campaign={row} onClose={() => setQrOpen(false)} />}
-      {historyOpen && <CampaignEventLog slug={row.slug} onClose={() => setHistoryOpen(false)} />}
-      {editOpen && (
-        <DestinationEditDialog
-          campaign={row}
-          onClose={() => setEditOpen(false)}
-          onDone={() => {
-            setEditOpen(false);
-            onChanged();
-          }}
-        />
-      )}
-      {deleteOpen && (
-        <DeleteCampaignDialog
-          campaign={row}
-          hasScans={row.stats.hasScans}
-          onClose={() => setDeleteOpen(false)}
-          onDone={() => {
-            setDeleteOpen(false);
-            onChanged();
-          }}
-        />
-      )}
+        {/* Fixed-position overlays — kept inside a <td> (a <tr> may not contain a <div>). */}
+        {qrOpen && <QrDialog campaign={row} onClose={() => setQrOpen(false)} />}
+        {historyOpen && <CampaignEventLog slug={row.slug} onClose={() => setHistoryOpen(false)} />}
+        {editOpen && (
+          <DestinationEditDialog
+            campaign={row}
+            onClose={() => setEditOpen(false)}
+            onDone={() => {
+              setEditOpen(false);
+              onChanged();
+            }}
+          />
+        )}
+        {deleteOpen && (
+          <DeleteCampaignDialog
+            campaign={row}
+            hasScans={row.stats.hasScans}
+            onClose={() => setDeleteOpen(false)}
+            onDone={() => {
+              setDeleteOpen(false);
+              onChanged();
+            }}
+          />
+        )}
+      </td>
     </tr>
   );
 }
