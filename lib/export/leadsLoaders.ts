@@ -40,7 +40,7 @@ export interface ScanLeadRow {
 }
 
 /** Count leads per campaign slug (single read; RLS member-read). */
-async function countLeadsBySlug(slugs: string[]): Promise<Record<string, number>> {
+export async function countLeadsBySlug(slugs: string[]): Promise<Record<string, number>> {
   const out: Record<string, number> = {};
   if (slugs.length === 0) return out;
   const supabase = createClient();
