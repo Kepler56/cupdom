@@ -289,3 +289,58 @@ export interface CampaignRowVM extends Campaign {
   dealTitle: string | null;     // linked deal label
   stats: CampaignStats;
 }
+
+// ── Leads (Spec 3A §5) — consumer end-users captured at the form (NOT CRM contacts) ──
+export interface Lead {
+  id: string;
+  campaignSlug: string;
+  firstName: string | null;
+  lastName: string | null;
+  email: string | null;
+  phone: string | null;
+  firstSeenAt: string;        // ISO; set once
+  lastActivityAt: string;     // ISO; refreshed on every (re)submission — the 3B retention clock
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ── Consent record (Spec 3A §5 / AC-9) — immutable accountability evidence, NO IP ──
+export interface LeadConsent {
+  id: string;
+  leadId: string | null;
+  campaignSlug: string;
+  sponsorName: string | null;
+  consentText: string;        // the EXACT wording shown to the consumer
+  consentVersion: string | null;
+  createdAt: string;
+}
+
+// ── Funnel events (Spec 3A §6) — one row per non-manual stage crossing ──
+export type FunnelEventKind = 'form_view' | 'form_submit' | 'offer_reached';
+
+export interface FunnelEvent {
+  id: string;
+  campaignSlug: string;
+  kind: FunnelEventKind;
+  visitorHash: string | null; // best-effort dedupe key (no IP); may be null on the public client
+  createdAt: string;
+}
+
+// ── Funnel rollup (Spec 3A §6 / AC-14) — counts Spec 4 will chart; this plan provides the data ──
+export type FunnelStageId =
+  | 'distribues' | 'scannes' | 'formulaire_vu' | 'formulaire_soumis' | 'offre_atteinte';
+
+export interface FunnelStage {
+  id: FunnelStageId;
+  label: string;              // FR: 'Distribués' | 'Scannés' | 'Formulaire vu' | …
+  count: number;
+}
+
+// Display order + French labels (single source for the loader and the Spec 4 chart).
+export const FUNNEL_STAGES: { id: FunnelStageId; label: string }[] = [
+  { id: 'distribues',        label: 'Distribués' },
+  { id: 'scannes',           label: 'Scannés' },
+  { id: 'formulaire_vu',     label: 'Formulaire vu' },
+  { id: 'formulaire_soumis', label: 'Formulaire soumis' },
+  { id: 'offre_atteinte',    label: 'Offre atteinte' },
+];
