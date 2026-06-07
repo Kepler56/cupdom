@@ -2,9 +2,10 @@ import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 
 /** Paths reachable without a session (everything else under (app) is protected). */
-// Public surfaces an anonymous visitor must reach (Spec 2B/3A/3B): the ended page, the /c/<slug>
-// lead form, and the /confidentialite privacy policy — they must never bounce to /login.
-const PUBLIC_PREFIXES = ['/login', '/set-password', '/auth', '/campagne-terminee', '/c', '/confidentialite'];
+// Public surfaces an anonymous visitor must reach (Spec 2B/3A/3B): the scan redirector, the ended
+// page, the /c/<slug> lead form, and the /confidentialite privacy policy — never bounce to /login.
+// ('/s' is also excluded from the middleware matcher; this is defence-in-depth.)
+const PUBLIC_PREFIXES = ['/login', '/set-password', '/auth', '/s', '/campagne-terminee', '/c', '/confidentialite'];
 
 function isPublic(pathname: string): boolean {
   return PUBLIC_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`));
