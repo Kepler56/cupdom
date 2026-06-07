@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import Link from 'next/link';
 import { BarChart3, History, MoreHorizontal, Pencil, Power, QrCode, Trash2 } from 'lucide-react';
 import { Icon } from '@/components/atoms/Icon';
@@ -48,6 +49,19 @@ export function CampaignRow({ row, onChanged }: CampaignRowProps) {
     }
   }
 
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null);
+  const MENU_W = 208; // w-52
+
+  function openMenu() {
+    const r = triggerRef.current?.getBoundingClientRect();
+    if (!r) return;
+    // Anchor the menu's right edge to the trigger, clamped inside the viewport.
+    const left = Math.max(8, Math.min(r.right - MENU_W, window.innerWidth - MENU_W - 8));
+    setMenuPos({ top: r.bottom + 4, left });
+    setMenuOpen(true);
+  }
+
   function closeMenu() {
     setMenuOpen(false);
   }
@@ -90,17 +104,29 @@ export function CampaignRow({ row, onChanged }: CampaignRowProps) {
             <span className="text-xs text-text-faint">— non lié</span>
           )}
 
-          <div className="relative">
-            <button
-              type="button"
-              aria-label="Plus d'actions"
-              onClick={() => setMenuOpen((o) => !o)}
-              className="rounded-input p-1 text-text-muted hover:bg-canvas hover:text-text"
-            >
-              <Icon icon={MoreHorizontal} size={16} />
-            </button>
-            {menuOpen && (
-              <div className="absolute right-0 z-50 mt-1 w-52 overflow-hidden rounded-card border border-border bg-surface text-sm shadow-lg">
+          <button
+            ref={triggerRef}
+            type="button"
+            aria-label="Plus d'actions"
+            onClick={() => (menuOpen ? closeMenu() : openMenu())}
+            className="rounded-input p-1 text-text-muted hover:bg-canvas hover:text-text"
+          >
+            <Icon icon={MoreHorizontal} size={16} />
+          </button>
+        </div>
+
+        {/* Actions menu — portaled to <body> with fixed positioning so the table's
+            overflow never clips it. A transparent backdrop closes it on outside click. */}
+        {menuOpen &&
+          menuPos &&
+          createPortal(
+            <>
+              <div className="fixed inset-0 z-40" onClick={closeMenu} aria-hidden />
+              <div
+                role="menu"
+                style={{ top: menuPos.top, left: menuPos.left }}
+                className="fixed z-50 w-52 overflow-hidden rounded-card border border-border bg-surface text-sm shadow-lg"
+              >
                 <Link
                   href={`/campagnes/${row.slug}`}
                   onClick={closeMenu}
@@ -143,9 +169,9 @@ export function CampaignRow({ row, onChanged }: CampaignRowProps) {
                   </>
                 )}
               </div>
-            )}
-          </div>
-        </div>
+            </>,
+            document.body,
+          )}
 
         {/* Fixed-position overlays — kept inside a <td> (a <tr> may not contain a <div>). */}
         {qrOpen && <QrDialog campaign={row} onClose={() => setQrOpen(false)} />}
