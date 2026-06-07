@@ -29,11 +29,14 @@ create table if not exists public.leads (
   updated_at       timestamptz not null default now()
 );
 
--- Dedup: at most ONE lead per (campaign, lower(email)). A repeat submission UPSERTs onto
--- this row (refreshing last_activity_at) instead of creating a duplicate (AC-10). The same
--- email on a DIFFERENT campaign is a separate row (different campaign_slug → AC-11).
+-- Dedup: at most ONE lead per (campaign, email). The Edge Function stores email already
+-- NORMALISED (trim + lowercase via normaliseEmail), so this PLAIN unique index gives the same
+-- case-insensitive dedup as lower(email) while remaining a valid PostgREST upsert conflict target
+-- (a functional index cannot be named in ON CONFLICT via PostgREST). A repeat submission UPSERTs
+-- onto this row (refreshing last_activity_at) instead of duplicating (AC-10); the same email on a
+-- DIFFERENT campaign is a separate row (different campaign_slug → AC-11).
 create unique index if not exists leads_campaign_email_uidx
-  on public.leads (campaign_slug, lower(email));
+  on public.leads (campaign_slug, email);
 create index if not exists leads_campaign_idx       on public.leads (campaign_slug);
 create index if not exists leads_last_activity_idx  on public.leads (last_activity_at);
 
