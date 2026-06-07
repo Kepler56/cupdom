@@ -81,8 +81,8 @@ export function QrDialog({ campaign, onClose }: QrDialogProps) {
         </div>
 
         <p className="mt-4 text-xs leading-relaxed text-text-faint">
-          Impression : correction d&apos;erreur H, taille ≥ 2 cm, fort contraste, zone de silence autour du code.
-          Pour un tirage en lot, utilisez <code>generate_qr.py</code>.
+          Conseil d&apos;impression : forte correction d&apos;erreur, taille ≥ 2 cm, bon contraste et une zone de
+          silence (marge blanche) autour du code.
         </p>
       </div>
     </div>
