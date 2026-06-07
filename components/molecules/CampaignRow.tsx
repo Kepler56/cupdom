@@ -1,7 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { History, MoreHorizontal, Pencil, Power, QrCode, Trash2 } from 'lucide-react';
+import Link from 'next/link';
+import { BarChart3, History, MoreHorizontal, Pencil, Power, QrCode, Trash2 } from 'lucide-react';
 import { Icon } from '@/components/atoms/Icon';
 import { OwnerChip } from '@/components/molecules/OwnerChip';
 import { CampaignStateBadge } from '@/components/molecules/CampaignStateBadge';
@@ -100,6 +101,13 @@ export function CampaignRow({ row, onChanged }: CampaignRowProps) {
             </button>
             {menuOpen && (
               <div className="absolute right-0 z-50 mt-1 w-52 overflow-hidden rounded-card border border-border bg-surface text-sm shadow-lg">
+                <Link
+                  href={`/campagnes/${row.slug}`}
+                  onClick={closeMenu}
+                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-text hover:bg-canvas"
+                >
+                  <Icon icon={BarChart3} size={14} /> Détails &amp; leads
+                </Link>
                 <button
                   type="button"
                   onClick={() => {
