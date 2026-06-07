@@ -2,7 +2,9 @@ import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 
 /** Paths reachable without a session (everything else under (app) is protected). */
-const PUBLIC_PREFIXES = ['/login', '/set-password', '/auth'];
+// '/campagne-terminee' is the public ended/indisponible page an anonymous scanner lands on
+// after a /s/<slug> redirect (Spec 2B) — it must never bounce to /login.
+const PUBLIC_PREFIXES = ['/login', '/set-password', '/auth', '/campagne-terminee'];
 
 function isPublic(pathname: string): boolean {
   return PUBLIC_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`));
