@@ -84,6 +84,12 @@ export function LeadForm({ slug }: { slug: string }) {
 
   return (
     <div className="w-full max-w-md rounded-card border border-border bg-surface p-6 shadow-sm sm:p-8">
+      <span
+        className="mb-4 flex h-11 w-11 items-center justify-center rounded-input bg-primary text-lg font-bold uppercase text-primary-contrast"
+        aria-hidden
+      >
+        {sponsor.trim().charAt(0) || 'C'}
+      </span>
       <h1 className="mb-1 text-xl font-semibold text-text">Pour accéder à l&apos;offre de {sponsor}</h1>
       <p className="mb-6 text-sm text-text-muted">
         Renseignez vos coordonnées pour recevoir votre offre. C&apos;est rapide et sans engagement.
