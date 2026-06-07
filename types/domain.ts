@@ -351,3 +351,60 @@ export const FUNNEL_STAGES: { id: FunnelStageId; label: string }[] = [
 export type EraseLeadResult =
   | { ok: true }
   | { ok: false; reason: 'not_owner' | 'not_found' | 'unknown'; message: string };
+
+// ── Funnel presentation (Spec 4 §4.7 / AC-9) ────────────────────────────────
+// Step keys + labels reuse the 3A FunnelStageId / FUNNEL_STAGES (identical five-stage order);
+// these add the on-screen %/drop presentation derived by lib/funnel.ts#buildFunnel.
+export type FunnelStepKey = FunnelStageId;
+
+export interface FunnelStep {
+  key: FunnelStepKey;
+  label: string;
+  count: number;        // absolute units at this stage
+  pctOfTop: number;     // 0..100 — count / first-non-zero baseline * 100 (the bar width)
+  pctOfPrev: number;    // raw % — count / previous-step count * 100 (per-step conversion, may exceed 100)
+  dropFromPrev: number; // 0..100 — max(0, 100 - pctOfPrev) (abandonment at this step)
+}
+
+export interface Funnel {
+  steps: FunnelStep[];
+  biggestDropIdx: number | null; // index of the largest dropFromPrev (>0); earliest on tie; null if none
+}
+
+// Raw per-campaign counters fed into buildFunnel (from the 3A campaign_funnel view).
+export interface FunnelSources {
+  distribues: number;        // qr_campaigns.distributed_count (owner-entered; 0 if unset)
+  scannes: number;           // distinct non-bot visitor_hash in qr_scans
+  formulaireVu: number;      // funnel_events kind 'form_view'
+  formulaireSoumis: number;  // funnel_events kind 'form_submit'
+  offreAtteinte: number;     // funnel_events kind 'offer_reached'
+}
+
+// ── Aperçu KPIs (Spec 4 §4.1) ───────────────────────────────────────────────
+export type KpiKey = 'contacts_actifs' | 'scans_30j' | 'leads_30j' | 'pipeline_eur';
+
+export const KPI_LABEL_FR: Record<KpiKey, string> = {
+  contacts_actifs: 'Contacts actifs',
+  scans_30j: 'Scans (30 j)',
+  leads_30j: 'Leads (30 j)',
+  pipeline_eur: 'Pipeline',
+};
+
+export interface KpiCardData {
+  key: KpiKey;
+  label: string;            // French label
+  value: string;            // already formatted (number fr-FR or EUR)
+  trendPct: number | null;  // signed % vs previous 30 days; null = no trend shown (e.g. pipeline)
+  trendSeries?: number[];   // optional 30-point series for the inline sparkline
+}
+
+// ── Nested-campaign inline stats (Spec 4 §4.3 Deals tab / AC-7) ──────────────
+export interface CampaignStat {
+  slug: string;
+  name: string;
+  active: boolean;          // qr_campaigns.active → Active/Terminée
+  scans: number;            // unique non-bot scanners
+  leads: number;            // captured leads
+  distribues: number;       // distributed_count (0 if unset)
+  conversionPct: number;    // leads / scans * 100 (0 when scans = 0)
+}
