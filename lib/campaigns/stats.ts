@@ -93,18 +93,23 @@ export async function loadCampaignStats(slugs: string[]): Promise<Record<string,
   if (slugs.length === 0) return out;
 
   const supabase = createClient();
-  const { data, error } = await supabase
-    .from('qr_scans')
-    .select('campaign_slug, is_bot, visitor_hash, campaign_state_at_scan')
-    .in('campaign_slug', slugs);
-  if (error) throw error;
+  const [scans, leads] = await Promise.all([
+    supabase.from('qr_scans').select('campaign_slug, is_bot, visitor_hash, campaign_state_at_scan').in('campaign_slug', slugs),
+    supabase.from('leads').select('campaign_slug').in('campaign_slug', slugs),
+  ]);
+  if (scans.error) throw scans.error;
 
   const bySlug = new Map<string, ScanLite[]>();
-  for (const r of (data as ScanRow[] | null ?? [])) {
+  for (const r of (scans.data as ScanRow[] | null ?? [])) {
     const arr = bySlug.get(r.campaign_slug) ?? [];
     arr.push({ isBot: Boolean(r.is_bot), visitorHash: r.visitor_hash, stateAtScan: r.campaign_state_at_scan });
     bySlug.set(r.campaign_slug, arr);
   }
   for (const [slug, rows] of bySlug) out[slug] = rollupScans(slug, rows);
+
+  // Real captured-lead count per campaign (rollupScans leaves leads = 0 as a pure placeholder).
+  for (const r of (leads.data as { campaign_slug: string }[] | null ?? [])) {
+    if (out[r.campaign_slug]) out[r.campaign_slug].leads += 1;
+  }
   return out;
 }
