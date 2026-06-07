@@ -344,3 +344,10 @@ export const FUNNEL_STAGES: { id: FunnelStageId; label: string }[] = [
   { id: 'formulaire_soumis', label: 'Formulaire soumis' },
   { id: 'offre_atteinte',    label: 'Offre atteinte' },
 ];
+
+// ── Lead GDPR erasure (Spec 3B §7 / AC-15) ──────────────────────────────────
+// Result of the owner-gated erase RPC wrapper (no throw on the expected "blocked" case;
+// mirrors 1E's LifecycleResult discriminated-union pattern).
+export type EraseLeadResult =
+  | { ok: true }
+  | { ok: false; reason: 'not_owner' | 'not_found' | 'unknown'; message: string };
