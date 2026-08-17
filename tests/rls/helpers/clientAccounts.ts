@@ -43,27 +43,34 @@ export async function createTestClient(
   }
   const authUserId = created.data.user.id;
 
-  const row = await svc
-    .from('client_accounts')
-    .insert({
-      auth_user_id: authUserId,
-      contact_id: opts.contactId,
-      email,
-      display_name: `Test ${opts.marker}`,
-      active: opts.active ?? true,
-      must_change_password: opts.mustChangePassword ?? false,
-    })
-    .select('id')
-    .single();
-  if (row.error) throw new Error(`client_accounts insert failed: ${row.error.message}`);
+  try {
+    const row = await svc
+      .from('client_accounts')
+      .insert({
+        auth_user_id: authUserId,
+        contact_id: opts.contactId,
+        email,
+        display_name: `Test ${opts.marker}`,
+        active: opts.active ?? true,
+        must_change_password: opts.mustChangePassword ?? false,
+      })
+      .select('id')
+      .single();
+    if (row.error) throw new Error(`client_accounts insert failed: ${row.error.message}`);
 
-  const client = createClient(url, anon, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
-  const signedIn = await client.auth.signInWithPassword({ email, password });
-  if (signedIn.error) throw new Error(`client sign-in failed: ${signedIn.error.message}`);
+    const client = createClient(url, anon, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+    const signedIn = await client.auth.signInWithPassword({ email, password });
+    if (signedIn.error) throw new Error(`client sign-in failed: ${signedIn.error.message}`);
 
-  return { client, authUserId, accountId: row.data!.id, contactId: opts.contactId, email, password };
+    return { client, authUserId, accountId: row.data!.id, contactId: opts.contactId, email, password };
+  } catch (err) {
+    // Unwind the auth user we just created so a failed insert/sign-in (the normal
+    // TDD red step, or any real failure) never leaks a user into auth.users.
+    await svc.auth.admin.deleteUser(authUserId);
+    throw err;
+  }
 }
 
 export async function destroyTestClient(
