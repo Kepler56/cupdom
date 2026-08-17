@@ -144,3 +144,46 @@ grant  execute on function public.is_client()                       to authentic
 grant  execute on function public.client_slugs()                    to authenticated;
 grant  execute on function public.client_owns_campaign(text)        to authenticated;
 grant  execute on function public.client_guard(text)                to authenticated;
+
+-- ------------------------------------------------------------
+-- 3. NEW qr_campaigns COLUMNS (additive, nullable).
+--    invested_amount_eur — the owner-confirmed amount the sponsor invested in
+--      THIS campaign, deliberately distinct from deals.value_eur. It exists so
+--      the portal's "coût par contact" KPI can never leak a deal value
+--      automatically (Spec §4.7). The CRM input for it ships in stage 5.
+--    venue — optional lieu/événement label, unlocking the portal's venue ranking
+--      (Spec §4.8). Granularity is per-campaign: one campaign spread across five
+--      clubs cannot be split by venue.
+-- ------------------------------------------------------------
+alter table public.qr_campaigns add column if not exists invested_amount_eur numeric(12,2);
+alter table public.qr_campaigns add column if not exists venue               text;
+
+-- ------------------------------------------------------------
+-- 4. CLIENT READ POLICIES — additive and PERMISSIVE. They OR with the existing
+--    member policies from 0006/0007, which are left untouched.
+--    Both route through public.client_slugs() rather than inlining a subquery
+--    over public.deals: deals has no client-read policy (by design — clients
+--    must never read it directly), so a policy body that queries deals as the
+--    calling client would see zero rows and every campaign/lead would be
+--    invisible. client_slugs() is SECURITY DEFINER, so it resolves ownership
+--    as the function owner, bypassing RLS on deals/qr_campaigns entirely —
+--    no recursion, since a policy ON qr_campaigns calling a SECURITY DEFINER
+--    function that reads qr_campaigns does not re-trigger that same policy.
+--    The `in (select …)` form still evaluates the set ONCE per query rather
+--    than once per row (Spec §5.5-3). For a member (or anon)
+--    current_client_contact() is NULL inside client_slugs(), the set is
+--    empty, and the policy contributes nothing — no leak.
+-- ------------------------------------------------------------
+drop policy if exists "qr_campaigns read client" on public.qr_campaigns;
+create policy "qr_campaigns read client" on public.qr_campaigns
+  for select to authenticated
+  using (slug in (select public.client_slugs()));
+
+drop policy if exists "leads read client" on public.leads;
+create policy "leads read client" on public.leads
+  for select to authenticated
+  using (campaign_slug in (select public.client_slugs()));
+
+-- NOTE: NO client policy is created on qr_scans or funnel_events. Raw scan rows
+-- never leave Postgres; visitor_hash is never exposed. Section 5's RPCs are the
+-- only client path to that data (Spec §5.3).

@@ -25,12 +25,19 @@ const A_PASSWORD = process.env.TEST_MEMBER_A_PASSWORD;
 const configured = Boolean(URL && ANON && SERVICE && A_EMAIL && A_PASSWORD);
 const MARKER = `p5-${Date.now()}`;
 
+const ALPHABET = 'abcdefghjkmnpqrstuvwxyz23456789';
+const newSlug = () =>
+  Array.from({ length: 8 }, () => ALPHABET[Math.floor(Math.random() * ALPHABET.length)]).join('');
+
 describe.skipIf(!configured)('Spec 5 client portal RLS — positive space', () => {
   let svc: SupabaseClient;
   let member: SupabaseClient;
   let memberId = '';
   let contactId = '';
   let portal: TestClientAccount | undefined;
+  let OWNED = '';    // campaign linked to the client's contact
+  let ORPHAN = '';   // campaign with deal_id NULL — invisible to every client
+  const seededSlugs: string[] = [];
 
   beforeAll(async () => {
     svc = createClient(URL!, SERVICE!, { auth: { persistSession: false, autoRefreshToken: false } });
@@ -49,9 +56,48 @@ describe.skipIf(!configured)('Spec 5 client portal RLS — positive space', () =
     contactId = contact.data!.id;
 
     portal = await createTestClient(svc, URL!, ANON!, { contactId, marker: MARKER });
+
+    const deal = await member
+      .from('deals')
+      .insert({ contact_id: contactId, title: `${MARKER} deal` })
+      .select('id')
+      .single();
+    if (deal.error) throw new Error(`deal insert failed: ${deal.error.message}`);
+
+    OWNED = newSlug();
+    ORPHAN = newSlug();
+    seededSlugs.push(OWNED, ORPHAN);
+
+    const camps = await svc.from('qr_campaigns').insert([
+      {
+        slug: OWNED,
+        sponsor_name: `${MARKER} Sponsor`,
+        destination_url: 'https://offre.example',
+        active: true,
+        deal_id: deal.data!.id,
+        distributed_count: 500,
+        invested_amount_eur: 1200,
+        venue: 'Rex Club',
+      },
+      {
+        slug: ORPHAN,
+        sponsor_name: `${MARKER} Orphan`,
+        destination_url: 'https://orphan.example',
+        active: true,
+        deal_id: null,
+      },
+    ]);
+    if (camps.error) throw new Error(`campaign seed failed: ${camps.error.message}`);
+
+    const leadsSeed = await svc.from('leads').insert([
+      { campaign_slug: OWNED, first_name: 'Marie', email: `marie-${MARKER}@x.fr` },
+      { campaign_slug: ORPHAN, first_name: 'Orphan', email: `orphan-${MARKER}@x.fr` },
+    ]);
+    if (leadsSeed.error) throw new Error(`leads seed failed: ${leadsSeed.error.message}`);
   });
 
   afterAll(async () => {
+    if (svc && seededSlugs.length) await svc.from('qr_campaigns').delete().in('slug', seededSlugs);
     await destroyTestClient(svc, portal);
     if (svc && contactId) await svc.from('contacts').delete().eq('id', contactId);
   });
@@ -96,5 +142,37 @@ describe.skipIf(!configured)('Spec 5 client portal RLS — positive space', () =
     const { error } = await member.rpc('client_guard', { p_slug: null });
     expect(error).not.toBeNull();
     expect(error!.message).toContain('accès refusé');
+  });
+
+  it('a client sees ONLY campaigns reachable from its contact', async () => {
+    const { data, error } = await portal!.client.from('qr_campaigns').select('slug');
+    expect(error).toBeNull();
+    const slugs = (data ?? []).map((r) => r.slug);
+    expect(slugs).toContain(OWNED);
+    expect(slugs).not.toContain(ORPHAN);
+  });
+
+  it('an unlinked campaign (deal_id NULL) is invisible to every client', async () => {
+    const { data } = await portal!.client.from('qr_campaigns').select('slug').eq('slug', ORPHAN);
+    expect(data ?? []).toHaveLength(0);
+  });
+
+  it('a client reads the leads of its own campaigns only', async () => {
+    const { data, error } = await portal!.client.from('leads').select('email, campaign_slug');
+    expect(error).toBeNull();
+    const slugs = (data ?? []).map((r) => r.campaign_slug);
+    expect(slugs).toContain(OWNED);
+    expect(slugs).not.toContain(ORPHAN);
+  });
+
+  it('the new campaign columns are readable by the owning client', async () => {
+    const { data, error } = await portal!.client
+      .from('qr_campaigns')
+      .select('invested_amount_eur, venue')
+      .eq('slug', OWNED)
+      .single();
+    expect(error).toBeNull();
+    expect(Number(data!.invested_amount_eur)).toBe(1200);
+    expect(data!.venue).toBe('Rex Club');
   });
 });
