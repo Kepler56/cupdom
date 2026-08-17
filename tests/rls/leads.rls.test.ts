@@ -70,7 +70,14 @@ describe.skipIf(!configured || !SERVICE)('3A leads/consents/funnel RLS', () => {
   });
 
   afterAll(async () => {
-    await svc.from('qr_campaigns').delete().in('slug', slugs); // cascades leads/consents/funnel
+    // guard_campaign_delete() raises if a campaign still has qr_scans, and the
+    // campaign_funnel test below seeds some. That raise aborts the WHOLE delete
+    // statement, so every slug — and every lead hanging off it — survives the
+    // run. `cross@x.fr` then accumulates +2 per run and AC-11 fails on the next
+    // one. Scans first, and surface a failed cleanup instead of swallowing it.
+    await svc.from('qr_scans').delete().in('campaign_slug', slugs);
+    const { error } = await svc.from('qr_campaigns').delete().in('slug', slugs); // cascades leads/consents/funnel
+    if (error) throw new Error(`campaign cleanup failed: ${error.message}`);
     for (const client of [a, b]) if (client) await client.from('contacts').delete().like('company', `${MARKER}%`);
   });
 

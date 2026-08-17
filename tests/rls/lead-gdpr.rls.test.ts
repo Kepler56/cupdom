@@ -54,7 +54,12 @@ describe.skipIf(!configured || !SERVICE)('3B lead GDPR retention/erasure/purge',
   });
 
   afterAll(async () => {
-    await svc.from('qr_campaigns').delete().in('slug', slugs); // cascades leads/funnel
+    // Scans first: guard_campaign_delete() raises on a scanned campaign, and that
+    // raise aborts the whole statement — leaving every slug and its leads behind.
+    // Surface a failed cleanup rather than swallowing it.
+    await svc.from('qr_scans').delete().in('campaign_slug', slugs);
+    const { error } = await svc.from('qr_campaigns').delete().in('slug', slugs); // cascades leads/funnel
+    if (error) throw new Error(`campaign cleanup failed: ${error.message}`);
     if (a) await a.from('contacts').delete().like('company', `${MARKER}%`);
   });
 
