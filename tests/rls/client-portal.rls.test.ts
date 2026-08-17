@@ -72,8 +72,29 @@ describe.skipIf(!configured)('Spec 5 client portal RLS — positive space', () =
   });
 
   it('anon reads no client_accounts row', async () => {
-    const anon = createClient(URL!, ANON!, { auth: { persistSession: false } });
+    const anon = createClient(URL!, ANON!, { auth: { persistSession: false, autoRefreshToken: false } });
     const { data } = await anon.from('client_accounts').select('id');
     expect(data ?? []).toHaveLength(0);
+  });
+
+  it('current_client_contact resolves to the linked contact; is_client is true', async () => {
+    const contact = await portal!.client.rpc('current_client_contact');
+    expect(contact.error).toBeNull();
+    expect(contact.data).toBe(contactId);
+
+    const isClient = await portal!.client.rpc('is_client');
+    expect(isClient.error).toBeNull();
+    expect(isClient.data).toBe(true);
+  });
+
+  it('a CRM member is not a client: current_client_contact is null, is_client false', async () => {
+    expect((await member.rpc('current_client_contact')).data).toBeNull();
+    expect((await member.rpc('is_client')).data).toBe(false);
+  });
+
+  it('client_guard raises for a caller who is not a client', async () => {
+    const { error } = await member.rpc('client_guard', { p_slug: null });
+    expect(error).not.toBeNull();
+    expect(error!.message).toContain('accès refusé');
   });
 });

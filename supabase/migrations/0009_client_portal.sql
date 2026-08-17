@@ -56,3 +56,91 @@ create policy "client_accounts read members" on public.client_accounts
 -- client-provision Edge Function), plus the two SECURITY DEFINER RPCs in section 8.
 revoke all on public.client_accounts from anon, authenticated;
 grant select on public.client_accounts to authenticated;
+
+-- ------------------------------------------------------------
+-- 2. HELPER FUNCTIONS. All SECURITY DEFINER so they bypass RLS — this is what
+--    keeps the client_accounts self-read policy free of recursion (Spec §5.5-1).
+--    All STABLE so Postgres may cache them within a statement.
+-- ------------------------------------------------------------
+
+-- The contact behind the calling client, or NULL when the caller is not an
+-- active portal client (a CRM member, anon, or a deactivated account).
+create or replace function public.current_client_contact()
+returns uuid
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select ca.contact_id
+  from public.client_accounts ca
+  where ca.auth_user_id = auth.uid()
+    and ca.active
+  limit 1;
+$$;
+
+create or replace function public.is_client()
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select public.current_client_contact() is not null;
+$$;
+
+-- THE single definition of "campaigns this client owns". Every policy and every
+-- RPC below funnels through it. A campaign with deal_id IS NULL joins to nothing
+-- and is therefore invisible to every client (Spec §2) — that is the safe default.
+create or replace function public.client_slugs()
+returns setof text
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select c.slug
+  from public.qr_campaigns c
+  join public.deals d on d.id = c.deal_id
+  where d.contact_id = (select public.current_client_contact());
+$$;
+
+create or replace function public.client_owns_campaign(p_slug text)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (select 1 from public.client_slugs() s where s = p_slug);
+$$;
+
+-- The guard every RPC opens with. Two refusals, one message: the caller is not a
+-- client at all, or they named a campaign that is not theirs.
+create or replace function public.client_guard(p_slug text default null)
+returns void
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+begin
+  if (select public.current_client_contact()) is null then
+    raise exception 'accès refusé' using errcode = 'insufficient_privilege';
+  end if;
+  if p_slug is not null and not public.client_owns_campaign(p_slug) then
+    raise exception 'accès refusé' using errcode = 'insufficient_privilege';
+  end if;
+end;
+$$;
+
+revoke execute on function public.current_client_contact()          from public, anon;
+revoke execute on function public.is_client()                       from public, anon;
+revoke execute on function public.client_slugs()                    from public, anon;
+revoke execute on function public.client_owns_campaign(text)        from public, anon;
+revoke execute on function public.client_guard(text)                from public, anon;
+grant  execute on function public.current_client_contact()          to authenticated;
+grant  execute on function public.is_client()                       to authenticated;
+grant  execute on function public.client_slugs()                    to authenticated;
+grant  execute on function public.client_owns_campaign(text)        to authenticated;
+grant  execute on function public.client_guard(text)                to authenticated;
