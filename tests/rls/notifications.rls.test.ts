@@ -55,6 +55,19 @@ describe.skipIf(!configured)('1D notifications RLS', () => {
   });
 
   async function seedNotif(recipientId: string): Promise<string> {
+    // notifications_open_unique forbids two OPEN (unread) rows for the same
+    // (recipient_id, type, contact_id). Three tests below each seed the same
+    // triple, and the first leaves its row unread — so without clearing the
+    // prior open row first, seeds 2 and 3 violate the constraint. The
+    // constraint is correct; the seed has to respect it.
+    await admin
+      .from('notifications')
+      .delete()
+      .eq('recipient_id', recipientId)
+      .eq('type', 'task_overdue')
+      .eq('contact_id', ka)
+      .is('read_at', null);
+
     const { data, error } = await admin
       .from('notifications')
       .insert({ recipient_id: recipientId, type: 'task_overdue', contact_id: ka, payload: { kind: 'task_overdue' } })

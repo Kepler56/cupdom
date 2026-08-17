@@ -1,7 +1,7 @@
 'use client';
 
 import type { LucideIcon } from 'lucide-react';
-import { ArrowRightLeft, Bell, CheckSquare, Link2, Pencil, TrendingUp } from 'lucide-react';
+import { Archive, ArchiveRestore, ArrowRightLeft, Bell, CheckSquare, Link2, Pencil, TrendingUp } from 'lucide-react';
 import { Icon } from '@/components/atoms/Icon';
 import { useProfiles } from '@/lib/profiles';
 import { timeAgoFr } from '@/lib/dates';
@@ -14,6 +14,8 @@ const KIND_ICON: Record<HistoryKind, LucideIcon> = {
   task: CheckSquare,
   reminder: Bell,
   link: Link2,
+  archive: Archive,
+  restore: ArchiveRestore,
 };
 
 const KIND_LABEL: Record<HistoryKind, string> = {
@@ -23,6 +25,8 @@ const KIND_LABEL: Record<HistoryKind, string> = {
   task: 'Tâche',
   reminder: 'Rappel',
   link: 'Lien',
+  archive: 'Archivage',
+  restore: 'Restauration',
 };
 
 export function HistoryItem({ entry }: { entry: HistoryEntry }) {

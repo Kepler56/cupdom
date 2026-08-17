@@ -89,8 +89,11 @@ export interface ContactStatus extends Contact {
 }
 
 // ── Activity timeline (Spec 1B §5.8 / built out in 1C) ──────────────────────
+// Must stay in sync with the contact_history_kind_check CHECK constraint in Postgres.
+// 'archive'/'restore' are written by 0005's archive_contact()/restore_contact().
 export type HistoryKind =
-  | 'deal_stage' | 'transfer' | 'contact_edit' | 'task' | 'reminder' | 'link';
+  | 'deal_stage' | 'transfer' | 'contact_edit' | 'task' | 'reminder' | 'link'
+  | 'archive' | 'restore';
 
 export interface HistoryEntry {
   id: string;
