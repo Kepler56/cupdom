@@ -350,4 +350,50 @@ describe.skipIf(!configured)('Spec 5 client portal RLS — positive space', () =
     expect(Number(rows.find((r) => r.bucket === 'current')!.leads)).toBe(1);
     expect(Number(rows.find((r) => r.bucket === 'previous')!.scans)).toBe(0);
   });
+
+  it('client_mark_login stamps last_login_at on the caller\'s own row only', async () => {
+    const { error } = await portal!.client.rpc('client_mark_login');
+    expect(error).toBeNull();
+
+    const { data } = await svc
+      .from('client_accounts')
+      .select('last_login_at')
+      .eq('auth_user_id', portal!.authUserId)
+      .single();
+    expect(data!.last_login_at).not.toBeNull();
+  });
+
+  it('client_mark_password_changed clears must_change_password for the caller', async () => {
+    await svc
+      .from('client_accounts')
+      .update({ must_change_password: true })
+      .eq('auth_user_id', portal!.authUserId);
+
+    const { error } = await portal!.client.rpc('client_mark_password_changed');
+    expect(error).toBeNull();
+
+    const { data } = await svc
+      .from('client_accounts')
+      .select('must_change_password')
+      .eq('auth_user_id', portal!.authUserId)
+      .single();
+    expect(data!.must_change_password).toBe(false);
+  });
+
+  it('a member calling the session RPCs changes nothing', async () => {
+    const before = await svc
+      .from('client_accounts')
+      .select('must_change_password')
+      .eq('auth_user_id', portal!.authUserId)
+      .single();
+
+    await member.rpc('client_mark_password_changed'); // no row matches auth.uid()
+
+    const after = await svc
+      .from('client_accounts')
+      .select('must_change_password')
+      .eq('auth_user_id', portal!.authUserId)
+      .single();
+    expect(after.data!.must_change_password).toBe(before.data!.must_change_password);
+  });
 });

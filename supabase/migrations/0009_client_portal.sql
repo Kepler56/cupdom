@@ -518,3 +518,91 @@ revoke execute on function public.client_overview(timestamptz, timestamptz, time
 grant  execute on function public.client_scans_geo(timestamptz, timestamptz, text, text)                to authenticated;
 grant  execute on function public.client_scans_tech(timestamptz, timestamptz, text)                     to authenticated;
 grant  execute on function public.client_overview(timestamptz, timestamptz, timestamptz, timestamptz, text) to authenticated;
+
+-- ------------------------------------------------------------
+-- 8. SESSION RPCs. client_accounts has NO client UPDATE policy, so these two
+--    SECURITY DEFINER functions are the only way a client may touch its own row.
+--    The `where auth_user_id = auth.uid()` clause IS the security boundary — a
+--    member or anon caller matches no row and silently changes nothing.
+-- ------------------------------------------------------------
+
+create or replace function public.client_mark_login()
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  update public.client_accounts
+     set last_login_at = now()
+   where auth_user_id = auth.uid()
+     and active;
+end;
+$$;
+
+create or replace function public.client_mark_password_changed()
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  update public.client_accounts
+     set must_change_password = false
+   where auth_user_id = auth.uid()
+     and active;
+end;
+$$;
+
+revoke execute on function public.client_mark_login()            from public, anon;
+revoke execute on function public.client_mark_password_changed() from public, anon;
+grant  execute on function public.client_mark_login()            to authenticated;
+grant  execute on function public.client_mark_password_changed() to authenticated;
+
+-- ============================================================
+-- VERIFICATION (read results below the query)
+-- ============================================================
+-- Expected: client_accounts exists with rowsecurity = true.
+select tablename, rowsecurity from pg_tables
+where schemaname = 'public' and tablename = 'client_accounts';
+
+-- Expected: 2 policies on client_accounts (both SELECT: self + members).
+select policyname, cmd from pg_policies
+where schemaname = 'public' and tablename = 'client_accounts' order by policyname;
+
+-- Expected: the two new qr_campaigns columns exist.
+select column_name from information_schema.columns
+where table_schema = 'public' and table_name = 'qr_campaigns'
+  and column_name in ('invested_amount_eur', 'venue');
+
+-- Expected: the client read policies exist ALONGSIDE the member ones
+-- (qr_campaigns -> 5 policies, leads -> 2). Nothing was replaced.
+select tablename, policyname, cmd from pg_policies
+where schemaname = 'public' and tablename in ('qr_campaigns', 'leads')
+order by tablename, policyname;
+
+-- Expected: ZERO rows. Clients must have no policy on qr_scans or funnel_events.
+select tablename, policyname from pg_policies
+where schemaname = 'public'
+  and tablename in ('qr_scans', 'funnel_events')
+  and policyname ilike '%client%';
+
+-- Expected: 14 functions, every one prosecdef = true (SECURITY DEFINER).
+-- NOTE: client_mark_login and client_mark_password_changed are deliberately
+-- VOLATILE, not STABLE, because they perform UPDATEs.
+select proname, prosecdef from pg_proc
+where pronamespace = 'public'::regnamespace
+  and proname in (
+    'current_client_contact','is_client','client_slugs','client_owns_campaign','client_guard',
+    'client_campaigns','client_funnel','client_scans_daily','client_scans_hourly',
+    'client_scans_geo','client_scans_tech','client_overview',
+    'client_mark_login','client_mark_password_changed'
+  )
+order by proname;
+
+-- Expected: ZERO rows. anon must hold EXECUTE on none of the client functions.
+select routine_name, grantee from information_schema.role_routine_grants
+where specific_schema = 'public' and grantee = 'anon' and routine_name like 'client%';
+
+-- Cleanup check (Option B only): ZERO rows. Stray test accounts from a crashed run.
+select id, email from public.client_accounts where email like 'portal-test+%@cupdom-test.invalid';
