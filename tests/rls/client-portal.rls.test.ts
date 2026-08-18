@@ -94,6 +94,22 @@ describe.skipIf(!configured)('Spec 5 client portal RLS — positive space', () =
       { campaign_slug: ORPHAN, first_name: 'Orphan', email: `orphan-${MARKER}@x.fr` },
     ]);
     if (leadsSeed.error) throw new Error(`leads seed failed: ${leadsSeed.error.message}`);
+
+    const scanSeed = await svc.from('qr_scans').insert([
+      { campaign_slug: OWNED, is_bot: false, visitor_hash: 'v1' },
+      { campaign_slug: OWNED, is_bot: false, visitor_hash: 'v2' },
+      { campaign_slug: OWNED, is_bot: false, visitor_hash: 'v2' }, // repeat → still 2 uniques
+      { campaign_slug: OWNED, is_bot: true, visitor_hash: 'bot1' }, // bot: excluded everywhere
+    ]);
+    if (scanSeed.error) throw new Error(`scan seed failed: ${scanSeed.error.message}`);
+
+    const funnelSeed = await svc.from('funnel_events').insert([
+      { campaign_slug: OWNED, kind: 'form_view', visitor_hash: 'h1' },
+      { campaign_slug: OWNED, kind: 'form_view', visitor_hash: 'h2' },
+      { campaign_slug: OWNED, kind: 'form_submit', visitor_hash: 'h1' },
+      { campaign_slug: OWNED, kind: 'offer_reached', visitor_hash: 'h1' },
+    ]);
+    if (funnelSeed.error) throw new Error(`funnel seed failed: ${funnelSeed.error.message}`);
   });
 
   afterAll(async () => {
@@ -174,5 +190,164 @@ describe.skipIf(!configured)('Spec 5 client portal RLS — positive space', () =
     expect(error).toBeNull();
     expect(Number(data!.invested_amount_eur)).toBe(1200);
     expect(data!.venue).toBe('Rex Club');
+  });
+
+  it('client_campaigns returns the client\'s campaigns with rollups, bots excluded', async () => {
+    const { data, error } = await portal!.client.rpc('client_campaigns');
+    expect(error).toBeNull();
+    const rows = data as Array<Record<string, unknown>>;
+    expect(rows.map((r) => r.slug)).toContain(OWNED);
+    expect(rows.map((r) => r.slug)).not.toContain(ORPHAN);
+
+    const owned = rows.find((r) => r.slug === OWNED)!;
+    expect(Number(owned.scans)).toBe(3); // 4 rows minus the bot
+    expect(Number(owned.uniques)).toBe(2); // v1, v2
+    expect(Number(owned.leads)).toBe(1);
+    expect(Number(owned.distributed_count)).toBe(500);
+    expect(Number(owned.invested_amount_eur)).toBe(1200);
+    expect(owned.venue).toBe('Rex Club');
+  });
+
+  it('client_funnel returns the five lifetime stage counts', async () => {
+    const { data, error } = await portal!.client.rpc('client_funnel', { p_slug: OWNED });
+    expect(error).toBeNull();
+    const f = (data as Array<Record<string, unknown>>)[0];
+    expect(Number(f.distribues)).toBe(500);
+    expect(Number(f.scannes)).toBe(2); // distinct non-bot visitor_hash
+    expect(Number(f.formulaire_vu)).toBe(2);
+    expect(Number(f.formulaire_soumis)).toBe(1);
+    expect(Number(f.offre_atteinte)).toBe(1);
+  });
+
+  it('client_funnel refuses a campaign the caller does not own', async () => {
+    const { error } = await portal!.client.rpc('client_funnel', { p_slug: ORPHAN });
+    expect(error).not.toBeNull();
+    expect(error!.message).toContain('accès refusé');
+  });
+
+  it('a member calling a client RPC is refused', async () => {
+    const { error } = await member.rpc('client_campaigns');
+    expect(error).not.toBeNull();
+    expect(error!.message).toContain('accès refusé');
+  });
+
+  it('client_scans_daily buckets by day and excludes bots', async () => {
+    const { data, error } = await portal!.client.rpc('client_scans_daily', {
+      p_from: '2000-01-01T00:00:00Z',
+      p_to: '2100-01-01T00:00:00Z',
+      p_slug: OWNED,
+    });
+    expect(error).toBeNull();
+    const rows = data as Array<Record<string, unknown>>;
+    const totalScans = rows.reduce((n, r) => n + Number(r.scans), 0);
+    const totalLeads = rows.reduce((n, r) => n + Number(r.leads), 0);
+    expect(totalScans).toBe(3); // the bot row is excluded
+    expect(totalLeads).toBe(1);
+  });
+
+  it('client_scans_hourly buckets in Europe/Paris, not UTC (DST-safe)', async () => {
+    // 2026-07-03T22:30:00Z is FRIDAY 22:30 UTC but SATURDAY 00:30 in Paris (UTC+2).
+    // A UTC bucket would say vendredi 22h; the correct answer is samedi 0h.
+    const dstSlug = OWNED;
+    await svc.from('qr_scans').insert({
+      campaign_slug: dstSlug,
+      is_bot: false,
+      visitor_hash: 'dst-1',
+      scanned_at: '2026-07-03T22:30:00Z',
+    });
+
+    const { data, error } = await portal!.client.rpc('client_scans_hourly', {
+      p_from: '2026-07-03T00:00:00Z',
+      p_to: '2026-07-05T00:00:00Z',
+      p_slug: dstSlug,
+    });
+    expect(error).toBeNull();
+    const rows = data as Array<{ dow: number; hour: number; scans: number }>;
+    const saturdayMidnight = rows.find((r) => Number(r.dow) === 6 && Number(r.hour) === 0);
+    expect(saturdayMidnight, 'expected a samedi 0h bucket (Paris), not vendredi 22h (UTC)').toBeDefined();
+    expect(rows.find((r) => Number(r.dow) === 5 && Number(r.hour) === 22)).toBeUndefined();
+  });
+
+  it('client_scans_daily refuses a campaign the caller does not own', async () => {
+    const { error } = await portal!.client.rpc('client_scans_daily', {
+      p_from: '2000-01-01T00:00:00Z',
+      p_to: '2100-01-01T00:00:00Z',
+      p_slug: ORPHAN,
+    });
+    expect(error).not.toBeNull();
+    expect(error!.message).toContain('accès refusé');
+  });
+
+  it('client_scans_geo groups by the requested level and labels unknowns', async () => {
+    await svc.from('qr_scans').insert([
+      { campaign_slug: OWNED, is_bot: false, visitor_hash: 'g1', country: 'FR', city: 'Paris' },
+      { campaign_slug: OWNED, is_bot: false, visitor_hash: 'g2', country: 'FR', city: 'Paris' },
+      { campaign_slug: OWNED, is_bot: false, visitor_hash: 'g3', country: 'FR', city: 'Lyon' },
+    ]);
+
+    const byCity = await portal!.client.rpc('client_scans_geo', {
+      p_from: '2000-01-01T00:00:00Z',
+      p_to: '2100-01-01T00:00:00Z',
+      p_slug: OWNED,
+      p_level: 'city',
+    });
+    expect(byCity.error).toBeNull();
+    const cities = byCity.data as Array<{ label: string; scans: number }>;
+    expect(cities.find((r) => r.label === 'Paris')).toBeDefined();
+    expect(Number(cities.find((r) => r.label === 'Paris')!.scans)).toBe(2);
+    expect(cities.find((r) => r.label === 'Inconnu')).toBeDefined(); // the earlier city-less scans
+
+    const byVenue = await portal!.client.rpc('client_scans_geo', {
+      p_from: '2000-01-01T00:00:00Z',
+      p_to: '2100-01-01T00:00:00Z',
+      p_slug: OWNED,
+      p_level: 'venue',
+    });
+    expect((byVenue.data as Array<{ label: string }>).map((r) => r.label)).toContain('Rex Club');
+  });
+
+  it('client_scans_geo rejects an invalid level rather than returning nothing', async () => {
+    const { error } = await portal!.client.rpc('client_scans_geo', {
+      p_from: '2000-01-01T00:00:00Z',
+      p_to: '2100-01-01T00:00:00Z',
+      p_slug: OWNED,
+      p_level: 'planet',
+    });
+    expect(error).not.toBeNull();
+    expect(error!.message).toContain('niveau invalide');
+  });
+
+  it('client_scans_tech returns one row per dimension value', async () => {
+    await svc.from('qr_scans').insert([
+      { campaign_slug: OWNED, is_bot: false, visitor_hash: 't1', device_type: 'mobile', os: 'iOS', browser: 'Safari', language: 'fr' },
+      { campaign_slug: OWNED, is_bot: false, visitor_hash: 't2', device_type: 'mobile', os: 'iOS', browser: 'Safari', language: 'fr' },
+    ]);
+    const { data, error } = await portal!.client.rpc('client_scans_tech', {
+      p_from: '2000-01-01T00:00:00Z',
+      p_to: '2100-01-01T00:00:00Z',
+      p_slug: OWNED,
+    });
+    expect(error).toBeNull();
+    const rows = data as Array<{ dimension: string; label: string; scans: number }>;
+    expect(new Set(rows.map((r) => r.dimension))).toEqual(
+      new Set(['device_type', 'os', 'browser', 'language']),
+    );
+    const ios = rows.find((r) => r.dimension === 'os' && r.label === 'iOS')!;
+    expect(Number(ios.scans)).toBe(2);
+  });
+
+  it('client_overview returns a current and a previous bucket', async () => {
+    const { data, error } = await portal!.client.rpc('client_overview', {
+      p_from: '2000-01-01T00:00:00Z',
+      p_to: '2100-01-01T00:00:00Z',
+      p_prev_from: '1990-01-01T00:00:00Z',
+      p_prev_to: '2000-01-01T00:00:00Z',
+      p_slug: OWNED,
+    });
+    expect(error).toBeNull();
+    const rows = data as Array<{ bucket: string; scans: number; leads: number }>;
+    expect(rows.map((r) => r.bucket).sort()).toEqual(['current', 'previous']);
+    expect(Number(rows.find((r) => r.bucket === 'current')!.leads)).toBe(1);
+    expect(Number(rows.find((r) => r.bucket === 'previous')!.scans)).toBe(0);
   });
 });

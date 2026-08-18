@@ -187,3 +187,334 @@ create policy "leads read client" on public.leads
 -- NOTE: NO client policy is created on qr_scans or funnel_events. Raw scan rows
 -- never leave Postgres; visitor_hash is never exposed. Section 5's RPCs are the
 -- only client path to that data (Spec §5.3).
+
+-- ------------------------------------------------------------
+-- 5. CAMPAIGN-LEVEL RPCs. SECURITY DEFINER + client_guard, so the raw tables
+--    stay unreadable while the aggregates are available. Bots are excluded from
+--    every figure (Spec §4.6-1).
+-- ------------------------------------------------------------
+
+create or replace function public.client_campaigns()
+returns table (
+  slug                text,
+  name                text,
+  sponsor_name        text,
+  product             text,
+  destination_url     text,
+  active              boolean,
+  venue               text,
+  distributed_count   int,
+  invested_amount_eur numeric,
+  created_at          timestamptz,
+  scans               bigint,
+  uniques             bigint,
+  leads               bigint
+)
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+begin
+  perform public.client_guard(null);
+  return query
+  select
+    c.slug, c.name, c.sponsor_name, c.product, c.destination_url, c.active,
+    c.venue, c.distributed_count, c.invested_amount_eur, c.created_at,
+    coalesce(s.scans, 0), coalesce(s.uniques, 0), coalesce(l.leads, 0)
+  from public.qr_campaigns c
+  join public.client_slugs() cs on cs = c.slug
+  left join (
+    select q.campaign_slug,
+           count(*)::bigint                        as scans,
+           count(distinct q.visitor_hash)::bigint  as uniques
+    from public.qr_scans q
+    where q.is_bot = false
+    group by q.campaign_slug
+  ) s on s.campaign_slug = c.slug
+  left join (
+    select ld.campaign_slug, count(*)::bigint as leads
+    from public.leads ld
+    group by ld.campaign_slug
+  ) l on l.campaign_slug = c.slug
+  order by c.created_at desc;
+end;
+$$;
+
+-- NOTE: this deliberately does NOT use public.campaign_funnel. That view is
+-- security_invoker over qr_scans, and since clients have no policy on qr_scans
+-- it would return scannes = 0 SILENTLY. A false zero is worse than an error
+-- (Spec §5.5-4). No date parameters: distribues is a campaign total, so a
+-- period-filtered funnel would be wrong (Spec §4.9).
+create or replace function public.client_funnel(p_slug text default null)
+returns table (
+  distribues        bigint,
+  scannes           bigint,
+  formulaire_vu     bigint,
+  formulaire_soumis bigint,
+  offre_atteinte    bigint
+)
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+begin
+  perform public.client_guard(p_slug);
+  return query
+  with scope as (
+    select cs as slug from public.client_slugs() cs
+    where p_slug is null or cs = p_slug
+  )
+  select
+    coalesce((select sum(coalesce(c.distributed_count, 0))
+              from public.qr_campaigns c join scope on scope.slug = c.slug), 0)::bigint,
+    coalesce((select count(distinct q.visitor_hash)
+              from public.qr_scans q join scope on scope.slug = q.campaign_slug
+              where q.is_bot = false), 0)::bigint,
+    coalesce((select count(*) from public.funnel_events f join scope on scope.slug = f.campaign_slug
+              where f.kind = 'form_view'), 0)::bigint,
+    coalesce((select count(*) from public.funnel_events f join scope on scope.slug = f.campaign_slug
+              where f.kind = 'form_submit'), 0)::bigint,
+    coalesce((select count(*) from public.funnel_events f join scope on scope.slug = f.campaign_slug
+              where f.kind = 'offer_reached'), 0)::bigint;
+end;
+$$;
+
+revoke execute on function public.client_campaigns()     from public, anon;
+revoke execute on function public.client_funnel(text)    from public, anon;
+grant  execute on function public.client_campaigns()     to authenticated;
+grant  execute on function public.client_funnel(text)    to authenticated;
+
+-- ------------------------------------------------------------
+-- 6. TIME-SERIES RPCs.
+--    EVERY bucket is computed `at time zone 'Europe/Paris'`. A scan at 00:30
+--    Paris in summer is 22:30 UTC the PREVIOUS DAY — bucketed in UTC the heatmap
+--    would show the wrong night (Spec §5.5-2). The range filter stays on the raw
+--    timestamptz so it remains index-friendly.
+--    dow uses isodow: 1 = lundi … 7 = dimanche.
+-- ------------------------------------------------------------
+
+create or replace function public.client_scans_daily(
+  p_from timestamptz,
+  p_to   timestamptz,
+  p_slug text default null
+)
+returns table (day date, scans bigint, uniques bigint, leads bigint)
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+begin
+  perform public.client_guard(p_slug);
+  return query
+  with scope as (
+    select cs as slug from public.client_slugs() cs
+    where p_slug is null or cs = p_slug
+  ),
+  sc as (
+    select (q.scanned_at at time zone 'Europe/Paris')::date as d,
+           count(*)::bigint                       as scans,
+           count(distinct q.visitor_hash)::bigint as uniques
+    from public.qr_scans q
+    join scope on scope.slug = q.campaign_slug
+    where q.is_bot = false
+      and q.scanned_at >= p_from
+      and q.scanned_at <  p_to
+    group by 1
+  ),
+  ld as (
+    select (l.first_seen_at at time zone 'Europe/Paris')::date as d,
+           count(*)::bigint as leads
+    from public.leads l
+    join scope on scope.slug = l.campaign_slug
+    where l.first_seen_at >= p_from
+      and l.first_seen_at <  p_to
+    group by 1
+  )
+  select coalesce(sc.d, ld.d)      as day,
+         coalesce(sc.scans, 0)     as scans,
+         coalesce(sc.uniques, 0)   as uniques,
+         coalesce(ld.leads, 0)     as leads
+  from sc
+  full outer join ld on ld.d = sc.d
+  order by 1;
+end;
+$$;
+
+create or replace function public.client_scans_hourly(
+  p_from timestamptz,
+  p_to   timestamptz,
+  p_slug text default null
+)
+returns table (dow int, hour int, scans bigint)
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+begin
+  perform public.client_guard(p_slug);
+  return query
+  with scope as (
+    select cs as slug from public.client_slugs() cs
+    where p_slug is null or cs = p_slug
+  )
+  select extract(isodow from (q.scanned_at at time zone 'Europe/Paris'))::int,
+         extract(hour   from (q.scanned_at at time zone 'Europe/Paris'))::int,
+         count(*)::bigint
+  from public.qr_scans q
+  join scope on scope.slug = q.campaign_slug
+  where q.is_bot = false
+    and q.scanned_at >= p_from
+    and q.scanned_at <  p_to
+  group by 1, 2
+  order by 1, 2;
+end;
+$$;
+
+revoke execute on function public.client_scans_daily(timestamptz, timestamptz, text)  from public, anon;
+revoke execute on function public.client_scans_hourly(timestamptz, timestamptz, text) from public, anon;
+grant  execute on function public.client_scans_daily(timestamptz, timestamptz, text)  to authenticated;
+grant  execute on function public.client_scans_hourly(timestamptz, timestamptz, text) to authenticated;
+
+-- ------------------------------------------------------------
+-- 7. BREAKDOWN RPCs.
+--    'Inconnu' rather than NULL for missing dimension values: the portal must
+--    never render a nameless bar, and an explicit unknown bucket is honest about
+--    coverage (Spec §4.6-3).
+-- ------------------------------------------------------------
+
+create or replace function public.client_scans_geo(
+  p_from  timestamptz,
+  p_to    timestamptz,
+  p_slug  text default null,
+  p_level text default 'country'
+)
+returns table (label text, scans bigint, uniques bigint)
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+begin
+  perform public.client_guard(p_slug);
+  if p_level not in ('country', 'region', 'city', 'venue') then
+    raise exception 'niveau invalide' using errcode = 'invalid_parameter_value';
+  end if;
+  return query
+  with scope as (
+    select cs as slug from public.client_slugs() cs
+    where p_slug is null or cs = p_slug
+  )
+  select coalesce(
+           case p_level
+             when 'country' then q.country
+             when 'region'  then q.region
+             when 'city'    then q.city
+             when 'venue'   then c.venue
+           end, 'Inconnu')::text,
+         count(*)::bigint,
+         count(distinct q.visitor_hash)::bigint
+  from public.qr_scans q
+  join scope on scope.slug = q.campaign_slug
+  join public.qr_campaigns c on c.slug = q.campaign_slug
+  where q.is_bot = false
+    and q.scanned_at >= p_from
+    and q.scanned_at <  p_to
+  group by 1
+  order by 2 desc, 1;
+end;
+$$;
+
+create or replace function public.client_scans_tech(
+  p_from timestamptz,
+  p_to   timestamptz,
+  p_slug text default null
+)
+returns table (dimension text, label text, scans bigint)
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+begin
+  perform public.client_guard(p_slug);
+  return query
+  with scope as (
+    select cs as slug from public.client_slugs() cs
+    where p_slug is null or cs = p_slug
+  ),
+  rows_in_range as (
+    select q.device_type, q.os, q.browser, q.language
+    from public.qr_scans q
+    join scope on scope.slug = q.campaign_slug
+    where q.is_bot = false
+      and q.scanned_at >= p_from
+      and q.scanned_at <  p_to
+  )
+  select 'device_type'::text, coalesce(r.device_type, 'Inconnu')::text, count(*)::bigint
+  from rows_in_range r group by 2
+  union all
+  select 'os'::text,          coalesce(r.os, 'Inconnu')::text,          count(*)::bigint
+  from rows_in_range r group by 2
+  union all
+  select 'browser'::text,     coalesce(r.browser, 'Inconnu')::text,     count(*)::bigint
+  from rows_in_range r group by 2
+  union all
+  select 'language'::text,    coalesce(r.language, 'Inconnu')::text,    count(*)::bigint
+  from rows_in_range r group by 2
+  order by 1, 3 desc, 2;
+end;
+$$;
+
+-- Exactly two rows: bucket = 'current' and bucket = 'previous', so one round trip
+-- serves both a KPI and its trend (Spec §4.2).
+create or replace function public.client_overview(
+  p_from      timestamptz,
+  p_to        timestamptz,
+  p_prev_from timestamptz,
+  p_prev_to   timestamptz,
+  p_slug      text default null
+)
+returns table (bucket text, scans bigint, uniques bigint, leads bigint)
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+begin
+  perform public.client_guard(p_slug);
+  return query
+  with scope as (
+    select cs as slug from public.client_slugs() cs
+    where p_slug is null or cs = p_slug
+  ),
+  windows as (
+    select 'current'::text as bucket, p_from as w_from, p_to as w_to
+    union all
+    select 'previous'::text, p_prev_from, p_prev_to
+  )
+  select w.bucket,
+         coalesce((select count(*) from public.qr_scans q
+                   join scope on scope.slug = q.campaign_slug
+                   where q.is_bot = false
+                     and q.scanned_at >= w.w_from and q.scanned_at < w.w_to), 0)::bigint,
+         coalesce((select count(distinct q.visitor_hash) from public.qr_scans q
+                   join scope on scope.slug = q.campaign_slug
+                   where q.is_bot = false
+                     and q.scanned_at >= w.w_from and q.scanned_at < w.w_to), 0)::bigint,
+         coalesce((select count(*) from public.leads l
+                   join scope on scope.slug = l.campaign_slug
+                   where l.first_seen_at >= w.w_from and l.first_seen_at < w.w_to), 0)::bigint
+  from windows w;
+end;
+$$;
+
+revoke execute on function public.client_scans_geo(timestamptz, timestamptz, text, text)                from public, anon;
+revoke execute on function public.client_scans_tech(timestamptz, timestamptz, text)                     from public, anon;
+revoke execute on function public.client_overview(timestamptz, timestamptz, timestamptz, timestamptz, text) from public, anon;
+grant  execute on function public.client_scans_geo(timestamptz, timestamptz, text, text)                to authenticated;
+grant  execute on function public.client_scans_tech(timestamptz, timestamptz, text)                     to authenticated;
+grant  execute on function public.client_overview(timestamptz, timestamptz, timestamptz, timestamptz, text) to authenticated;
