@@ -3,7 +3,7 @@
 -- ============================================================================
 -- Crée un contact « Démo Nightlife », un deal, trois campagnes et ~180 jours de
 -- scans réalistes (pic vendredi/samedi 23h-3h, heure de Paris), le tunnel
--- correspondant et les contacts captés.
+-- correspondant, les contacts captés et la preuve de consentement de chacun.
 --
 -- SÛRETÉ : tout est préfixé `demo-` et rattaché au contact « Démo Nightlife ».
 -- Aucune campagne réelle n'est touchée. Le bloc 0 supprime tout, donc le script
@@ -211,6 +211,34 @@ where f.campaign_slug like 'demo-%' and f.kind = 'form_submit'
 on conflict (campaign_slug, email) do nothing;
 
 
+-- ── 5b. Le consentement enregistré par contact ──────────────────────────────
+-- Un lead-submit réel écrit une ligne lead_consents à chaque envoi (voir
+-- lib/public/consent.ts) ; ce script insère les leads directement et sautait
+-- cette étape jusqu'ici, ce qui laissait la page « Contacts » de la démo sans
+-- aucune base légale à citer — un défaut de réalisme en soi, et une régression
+-- silencieuse pour client_lead_consents() (migration 0013).
+--
+-- Le texte est recopié VERBATIM depuis CONSENT_TEXT_FR (apostrophe droite
+-- J'accepte, pas typographique : c'est une preuve enregistrée, pas une
+-- formulation maison) et daté du premier envoi du lead (first_seen_at), pour
+-- que la preuve ne soit jamais postérieure au consentement qu'elle atteste.
+-- Nettoyage : couvert par le `delete ... qr_campaigns` du bloc 0, qui cascade
+-- campagnes → leads → lead_consents (migration 0007).
+insert into public.lead_consents
+  (lead_id, campaign_slug, sponsor_name, consent_text, consent_version, created_at)
+select
+  l.id,
+  l.campaign_slug,
+  c.sponsor_name,
+  'J''accepte que mes données soient traitées par Cupdom et partagées avec ' || c.sponsor_name ||
+    ' afin de recevoir cette offre et des communications marketing.',
+  'v1-2026-06',
+  l.first_seen_at
+from public.leads l
+join public.qr_campaigns c on c.slug = l.campaign_slug
+where l.campaign_slug like 'demo-%';
+
+
 -- ── 6. Rattacher les comptes portail de test au sponsor de démo ─────────────
 -- must_change_password est REMIS À PLAT ici, pas seulement le contact. Les deux
 -- comptes ont un rôle fixe : `portail-e2e@` reste bloqué sur l'écran de
@@ -241,9 +269,11 @@ select
   count(distinct s.visitor_hash) filter (where not s.is_bot) as personnes,
   count(*) filter (where s.is_bot)                   as bots_exclus,
   (select count(*) from public.leads l where l.campaign_slug = c.slug) as contacts,
+  (select count(*) from public.lead_consents lc where lc.campaign_slug = c.slug) as consentements,
   c.invested_amount_eur                              as investi_eur
 from public.qr_campaigns c
 left join public.qr_scans s on s.campaign_slug = c.slug
 where c.slug like 'demo-%'
 group by c.slug, c.venue, c.distributed_count, c.invested_amount_eur
 order by scans desc;
+-- Attendu : consentements = contacts, sur chaque ligne (une preuve par lead).
