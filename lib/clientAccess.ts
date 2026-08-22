@@ -22,11 +22,11 @@ const MESSAGES: Record<PortalAccessReason, string> = {
   not_member: 'Réservé à l’équipe Cupdom.',
   not_owner: 'Seul le propriétaire de ce contact peut donner l’accès au portail.',
   auth_user_exists:
-    'Un compte existe déjà pour cette adresse. Réinitialisez plutôt son mot de passe.',
+    'Un compte d’authentification existe déjà pour cette adresse, sans accès au portail. Supprimez-le dans Supabase avant de réessayer.',
   already_provisioned: 'Ce contact a déjà un accès au portail.',
   not_provisioned: 'Ce contact n’a pas encore d’accès au portail.',
   contact_has_no_email: 'Ajoutez une adresse e-mail à ce contact avant de lui donner l’accès.',
-  unavailable: 'La fonction n’est pas encore disponible. Réessayez une fois le déploiement terminé.',
+  unavailable: 'Le service est momentanément injoignable. Réessayez.',
   unknown: 'Action impossible pour le moment.',
 };
 

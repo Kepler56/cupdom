@@ -33,13 +33,18 @@ describe('grantPortalAccess', () => {
     expect(invoke).toHaveBeenCalledWith('client-provision', { body: { contactId: 'contact-1' } });
   });
 
-  it('offers a reset when an auth user already exists, rather than failing opaquely', async () => {
+  it('names an orphan auth user distinctly — no client_accounts row exists, so a reset cannot help', async () => {
+    // auth_user_exists means an auth user was created with no client_accounts
+    // row (a half-failed provision). client-reset-password looks that row up
+    // by contact_id and would only answer not_provisioned, so the message
+    // must not promise a reset — it must say what actually resolves this.
     invoke.mockResolvedValue(httpFailure({ ok: false, error: 'auth_user_exists' }, 409));
     const result = await grantPortalAccess('contact-1');
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.reason).toBe('auth_user_exists');
-      expect(result.message).toMatch(/réinitialis/i);
+      expect(result.message).toMatch(/Supabase/i);
+      expect(result.message).not.toMatch(/réinitialis/i);
     }
   });
 
@@ -63,16 +68,19 @@ describe('grantPortalAccess', () => {
     }
   });
 
-  it('says the feature is unavailable when the function is not deployed', async () => {
+  it('says the service is unreachable, in wording true of any transport failure — not just an undeployed function', async () => {
     // Until the product owner deploys, invoke() errors at the transport layer
     // — a FunctionsFetchError/FunctionsRelayError, NOT a FunctionsHttpError,
     // because there is no HTTP response at all to carry a structured body.
     // « Action impossible » would send someone hunting for a bug in the CRM.
+    // The message must not describe an undeployed function specifically — it
+    // stays the same error a network blip produces long after deployment.
     invoke.mockResolvedValue({ data: null, error: new Error('Function not found') });
     const result = await grantPortalAccess('contact-1');
     if (!result.ok) {
       expect(result.reason).toBe('unavailable');
-      expect(result.message).toMatch(/pas encore disponible|indisponible/i);
+      expect(result.message).toMatch(/injoignable/i);
+      expect(result.message).not.toMatch(/déploiement/i);
     }
   });
 

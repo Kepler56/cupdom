@@ -44,7 +44,13 @@ export function PortalAccessDialog({ contactId, contactName, onClose, onGranted 
       onGranted(`Accès au portail accordé — ${res.email}`);
     } else {
       setError(res.message);
-      setCanReset(res.reason === 'auth_user_exists');
+      // `already_provisioned` is the only refusal client-reset-password can
+      // actually resolve: a client_accounts row already exists, so the reset
+      // RPC will find it. `auth_user_exists` means the opposite — an auth
+      // user with NO client_accounts row — and client-reset-password looks
+      // that row up by contact_id, so offering the button there could only
+      // produce a second, contradictory refusal.
+      setCanReset(res.reason === 'already_provisioned');
     }
   }
 

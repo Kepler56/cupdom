@@ -27,6 +27,16 @@ export function InvestedAmountInput({ slug, value, canEdit }: InvestedAmountInpu
     if (!canEdit) return;
     const parsed = n.trim() === '' ? null : Number(n);
     if (n.trim() !== '' && (parsed === null || Number.isNaN(parsed))) return;
+    if (parsed !== null && parsed < 0) {
+      // setInvestedAmount would silently clamp this to null — correct for a
+      // programmatic caller, but here it would render "enregistré ✓" over a
+      // field still showing -500, which nothing was ever stored for. Refuse
+      // in the UI instead: no setter call, no confirmation, and the field
+      // reverts to the last value actually persisted so it stops displaying
+      // a number that was never saved.
+      setN(value == null ? '' : String(value));
+      return;
+    }
     try {
       await setInvestedAmount(slug, parsed);
       setSaved(true);

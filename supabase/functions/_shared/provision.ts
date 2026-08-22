@@ -1,7 +1,8 @@
 /**
- * PURE half of client-provision. No Deno globals, no network, no crypto call —
- * the caller supplies the random bytes, which is what makes this testable and
- * why the handler stays a thin shell (same split as lead-submit's validate.ts).
+ * Password generation and auth-collision helpers shared by client-provision
+ * AND client-reset-password. No Deno globals, no network, no crypto call — the
+ * caller supplies the random bytes, which is what makes this testable and why
+ * each handler stays a thin shell (same split as lead-submit's validate.ts).
  */
 
 /**

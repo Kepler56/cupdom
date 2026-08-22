@@ -1,4 +1,5 @@
-// Supabase Edge Function (Deno): resets a sponsor's portal password (Spec 5 §5.8).
+// Supabase Edge Function (Deno): resets a sponsor's portal password (Spec 5 §5.9 —
+// "A companion client-reset-password follows the same guard.").
 // Holds the service-role key (Edge secret, never the browser) and is the ONLY
 // path that resets a portal auth user's password without hand-written SQL.
 //
@@ -49,11 +50,23 @@ Deno.serve(async (req: Request): Promise<Response> => {
   if (!contactId) return json({ ok: false, error: 'bad_request' }, 400);
 
   // Guard 1 — a Cupdom member, evaluated as the caller.
-  const { data: isMember } = await caller.rpc('is_cupdom_member');
+  const { data: isMember, error: isMemberError } = await caller.rpc('is_cupdom_member');
+  if (isMemberError) {
+    // A refusal and a fault are different answers and must not look alike: an
+    // ungranted RPC, a schema-cache miss, or a dropped round-trip must not be
+    // told to a legitimate member as "Réservé à l’équipe Cupdom" with nothing
+    // logged anywhere.
+    console.error('[client-reset-password] is_cupdom_member failed:', isMemberError.code, isMemberError.message);
+    return json({ ok: false, error: 'unknown' }, 500);
+  }
   if (isMember !== true) return json({ ok: false, error: 'not_member' }, 403);
 
   // Guard 2 — and this member owns this contact.
-  const { data: owns } = await caller.rpc('owns_contact', { p_contact: contactId });
+  const { data: owns, error: ownsError } = await caller.rpc('owns_contact', { p_contact: contactId });
+  if (ownsError) {
+    console.error('[client-reset-password] owns_contact failed:', ownsError.code, ownsError.message);
+    return json({ ok: false, error: 'unknown' }, 500);
+  }
   if (owns !== true) return json({ ok: false, error: 'not_owner' }, 403);
 
   const { data: account } = await service

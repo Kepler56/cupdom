@@ -49,11 +49,32 @@ Deno.serve(async (req: Request): Promise<Response> => {
   if (!contactId) return json({ ok: false, error: 'bad_request' }, 400);
 
   // Guard 1 — a Cupdom member, evaluated as the caller.
-  const { data: isMember } = await caller.rpc('is_cupdom_member');
+  const { data: isMember, error: isMemberError } = await caller.rpc('is_cupdom_member');
+  if (isMemberError) {
+    // A refusal and a fault are different answers and must not look alike: an
+    // ungranted RPC, a schema-cache miss, or a dropped round-trip must not be
+    // told to a legitimate member as "Réservé à l’équipe Cupdom" with nothing
+    // logged anywhere — these are the first Edge Functions this codebase has
+    // deployed, with no other instrumentation.
+    console.error('[client-provision] is_cupdom_member failed:', isMemberError.code, isMemberError.message);
+    return json({ ok: false, error: 'unknown' }, 500);
+  }
   if (isMember !== true) return json({ ok: false, error: 'not_member' }, 403);
 
+  // The member performing this action — recorded on client_accounts.created_by
+  // for audit (Spec §5.2). Read once guard 1 has confirmed a real caller
+  // exists; `?? null` at the insert site handles a missing actor without
+  // failing a provision that has already created an auth user.
+  const {
+    data: { user: actor },
+  } = await caller.auth.getUser();
+
   // Guard 2 — and this member owns this contact.
-  const { data: owns } = await caller.rpc('owns_contact', { p_contact: contactId });
+  const { data: owns, error: ownsError } = await caller.rpc('owns_contact', { p_contact: contactId });
+  if (ownsError) {
+    console.error('[client-provision] owns_contact failed:', ownsError.code, ownsError.message);
+    return json({ ok: false, error: 'unknown' }, 500);
+  }
   if (owns !== true) return json({ ok: false, error: 'not_owner' }, 403);
 
   const { data: contact } = await service
@@ -94,6 +115,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
     email,
     display_name: contact?.company ?? null,
     must_change_password: true,
+    created_by: actor?.id ?? null,
   });
 
   if (insertError) {

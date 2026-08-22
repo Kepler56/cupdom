@@ -68,7 +68,9 @@ describe('PortalAccessDialog', () => {
   });
 
   it('offers the reset path when an account already exists', async () => {
-    grantPortalAccess.mockResolvedValue({ ok: false, reason: 'auth_user_exists', message: 'Un compte existe déjà.' });
+    // 'already_provisioned' — a client_accounts row already exists — is the
+    // one refusal client-reset-password can actually resolve.
+    grantPortalAccess.mockResolvedValue({ ok: false, reason: 'already_provisioned', message: 'Ce contact a déjà un accès au portail.' });
     resetPortalPassword.mockResolvedValue({ ok: true, email: 'nike@example.test', password: 'ZzYyXxWwVvUuTtSs' });
     open();
     await userEvent.click(screen.getByRole('button', { name: /Donner l’accès/ }));
@@ -82,7 +84,7 @@ describe('PortalAccessDialog', () => {
   it('reports a reissue to its caller, also without the password', async () => {
     // contact_history is storage, and Spec §5.9 says the password is never
     // stored — so a reset's summary is subject to the same rule as a grant's.
-    grantPortalAccess.mockResolvedValue({ ok: false, reason: 'auth_user_exists', message: 'Un compte existe déjà.' });
+    grantPortalAccess.mockResolvedValue({ ok: false, reason: 'already_provisioned', message: 'Ce contact a déjà un accès au portail.' });
     resetPortalPassword.mockResolvedValue({ ok: true, email: 'nike@example.test', password: 'ZzYyXxWwVvUuTtSs' });
     open();
     await userEvent.click(screen.getByRole('button', { name: /Donner l’accès/ }));
@@ -103,7 +105,7 @@ describe('PortalAccessDialog', () => {
       password: 'ZzYyXxWwVvUuTtSs',
       warning: 'Mot de passe changé, mais…',
     });
-    grantPortalAccess.mockResolvedValue({ ok: false, reason: 'auth_user_exists', message: 'Un compte existe déjà.' });
+    grantPortalAccess.mockResolvedValue({ ok: false, reason: 'already_provisioned', message: 'Ce contact a déjà un accès au portail.' });
     open();
     await userEvent.click(screen.getByRole('button', { name: /Donner l’accès/ }));
     await screen.findByRole('alert');
@@ -111,6 +113,27 @@ describe('PortalAccessDialog', () => {
 
     expect(await screen.findByText('ZzYyXxWwVvUuTtSs')).toBeInTheDocument();
     expect(screen.getByRole('status')).toHaveTextContent(/Mot de passe changé/);
+  });
+
+  it('offers the reset for a sponsor who already has access — the case where it actually works', async () => {
+    grantPortalAccess.mockResolvedValue({ ok: false, reason: 'already_provisioned', message: 'Ce contact a déjà un accès au portail.' });
+    open();
+    await userEvent.click(screen.getByRole('button', { name: /Donner l’accès/ }));
+    await screen.findByRole('alert');
+
+    expect(screen.getByRole('button', { name: /Réinitialiser/ })).toBeInTheDocument();
+  });
+
+  it('does NOT offer the reset for an orphan auth user, where it could only fail', async () => {
+    // auth_user_exists means no client_accounts row, so client-reset-password
+    // would answer not_provisioned. A button that can only produce a
+    // contradictory refusal is worse than no button.
+    grantPortalAccess.mockResolvedValue({ ok: false, reason: 'auth_user_exists', message: 'Un compte d’authentification existe déjà…' });
+    open();
+    await userEvent.click(screen.getByRole('button', { name: /Donner l’accès/ }));
+    await screen.findByRole('alert');
+
+    expect(screen.queryByRole('button', { name: /Réinitialiser/ })).toBeNull();
   });
 
   it('is a modal dialog, so a keyboard user is not left behind the overlay', () => {
