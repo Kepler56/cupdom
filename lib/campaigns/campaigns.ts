@@ -184,14 +184,14 @@ export async function setDistributedCount(slug: string, n: number | null): Promi
  * null CLEARS it. Zero does not: zero would render « 0,00 € par contact », which
  * claims the campaign was free. Absent and free are different statements.
  *
- * Clamped to >= 0 here rather than only in the input: a negative amount would
- * feed the portal's cost-per-contact tile, which a paying sponsor reads, and
- * `invested_amount_eur` carries no CHECK constraint — this is the only guard.
- * A negative figure is treated as an entry error (typo, paste), not a request
- * to clear the field, so it clamps to 0 rather than becoming null.
+ * A negative amount is a data-entry error, almost always a sign flip. It
+ * clamps to null rather than 0 because zero is not neutral here: it renders
+ * « 0,00 € par contact » and claims the campaign was free. Refusing the value
+ * forces a correction; coercing it to zero would publish a false one.
+ * `invested_amount_eur` carries no CHECK constraint, so this is the only guard.
  */
 export async function setInvestedAmount(slug: string, amount: number | null): Promise<void> {
-  const safe = amount === null ? null : Math.max(0, amount);
+  const safe = amount === null || amount < 0 ? null : amount;
   const { error } = await createClient().from('qr_campaigns').update({ invested_amount_eur: safe }).eq('slug', slug);
   if (error) throw error;
 }

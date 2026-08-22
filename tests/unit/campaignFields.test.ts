@@ -91,9 +91,9 @@ describe('setInvestedAmount', () => {
     expect(update).toHaveBeenCalledWith({ invested_amount_eur: null });
   });
 
-  it('clamps a negative amount to 0 — the column has no CHECK constraint, and a negative figure would reach a paying sponsor', async () => {
+  it('clamps a negative amount to null, not 0 — zero is not neutral here: it would render 0,00 € par contact and claim the campaign was free', async () => {
     await setInvestedAmount('nike-hiver', -500);
-    expect(update).toHaveBeenCalledWith({ invested_amount_eur: 0 });
+    expect(update).toHaveBeenCalledWith({ invested_amount_eur: null });
   });
 
   it('throws when the write fails, so the input does not show a false enregistré ✓', async () => {

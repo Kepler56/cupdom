@@ -44,7 +44,7 @@ export function InvestedAmountInput({ slug, value, canEdit }: InvestedAmountInpu
         min={0}
         step="0.01"
         aria-label="Montant investi (€)"
-        title="Le portail n’affiche le coût par contact que si toutes les campagnes du sponsor ont un montant."
+        title="Le portail n’affiche le coût par contact que si toutes les campagnes de la sélection ont un montant."
         value={n}
         disabled={!canEdit}
         onChange={(e) => setN(e.target.value)}
