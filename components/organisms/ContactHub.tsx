@@ -8,9 +8,11 @@ import { TaskList } from './TaskList';
 import { ReminderList } from './ReminderList';
 import { LinkList } from './LinkList';
 import { HistoriqueTab } from './HistoriqueTab';
+import { Button } from '@/components/atoms/Button';
 import { ContactForm } from '@/components/molecules/ContactForm';
 import { TransferDialog } from '@/components/molecules/TransferDialog';
 import { ArchiveContactDialog } from '@/components/molecules/ArchiveContactDialog';
+import { PortalAccessDialog } from '@/components/molecules/PortalAccessDialog';
 import { cn } from '@/lib/cn';
 import {
   contactDisplayName,
@@ -33,6 +35,7 @@ export function ContactHub({ contactId }: { contactId: string }) {
   const [editing, setEditing] = useState(false);
   const [transferOpen, setTransferOpen] = useState(false);
   const [archiveOpen, setArchiveOpen] = useState(false);
+  const [portalOpen, setPortalOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
@@ -78,6 +81,12 @@ export function ContactHub({ contactId }: { contactId: string }) {
       />
 
       <div>
+        <div className="mb-4 flex justify-end">
+          <Button size="sm" variant="secondary" onClick={() => setPortalOpen(true)}>
+            Donner l’accès au portail
+          </Button>
+        </div>
+
         <div className="mb-4 flex gap-1 border-b border-border">
           {TABS.map((t) => (
             <button
@@ -137,6 +146,20 @@ export function ContactHub({ contactId }: { contactId: string }) {
             setArchiveOpen(false);
             router.push('/contacts');
             router.refresh();
+          }}
+        />
+      )}
+
+      {portalOpen && contact && (
+        <PortalAccessDialog
+          contactId={contact.id}
+          contactName={contactDisplayName(contact)}
+          onClose={() => setPortalOpen(false)}
+          onGranted={(summary) => {
+            // The summary comes from the dialog and is built from the contact and
+            // the e-mail — never from the password. contact_history is storage,
+            // and Spec §5.9 says the password is never stored.
+            void appendHistory(contact.id, 'portal_access', summary).catch(() => {});
           }}
         />
       )}
