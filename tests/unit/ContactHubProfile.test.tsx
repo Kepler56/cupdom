@@ -27,7 +27,15 @@ describe('ContactHubProfile', () => {
 
   it('renders statut, owner and coordonnées', () => {
     (useCanEdit as Mock).mockReturnValue(false);
-    render(<ContactHubProfile contact={contact} onEdit={noop} onTransfer={noop} onArchive={noop} />);
+    render(
+      <ContactHubProfile
+        contact={contact}
+        onEdit={noop}
+        onTransfer={noop}
+        onArchive={noop}
+        onPortalAccess={noop}
+      />,
+    );
     expect(screen.getByText('Client')).toBeInTheDocument();
     expect(screen.getByText('Eliah')).toBeInTheDocument();
     expect(screen.getByText('marie@acme.fr')).toBeInTheDocument();
@@ -38,21 +46,41 @@ describe('ContactHubProfile', () => {
     const onEdit = vi.fn();
     const onTransfer = vi.fn();
     const onArchive = vi.fn();
-    render(<ContactHubProfile contact={contact} onEdit={onEdit} onTransfer={onTransfer} onArchive={onArchive} />);
+    const onPortalAccess = vi.fn();
+    render(
+      <ContactHubProfile
+        contact={contact}
+        onEdit={onEdit}
+        onTransfer={onTransfer}
+        onArchive={onArchive}
+        onPortalAccess={onPortalAccess}
+      />,
+    );
 
     fireEvent.click(screen.getByRole('button', { name: 'Modifier' }));
     fireEvent.click(screen.getByRole('button', { name: 'Transférer' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Donner l’accès au portail' }));
     fireEvent.click(screen.getByRole('button', { name: 'Archiver' }));
     expect(onEdit).toHaveBeenCalledOnce();
     expect(onTransfer).toHaveBeenCalledOnce();
+    expect(onPortalAccess).toHaveBeenCalledOnce();
     expect(onArchive).toHaveBeenCalledOnce();
   });
 
   it('hides actions when not editable (read-only scope / not owner)', () => {
     (useCanEdit as Mock).mockReturnValue(false);
-    render(<ContactHubProfile contact={contact} onEdit={noop} onTransfer={noop} onArchive={noop} />);
+    render(
+      <ContactHubProfile
+        contact={contact}
+        onEdit={noop}
+        onTransfer={noop}
+        onArchive={noop}
+        onPortalAccess={noop}
+      />,
+    );
     expect(screen.queryByRole('button', { name: 'Modifier' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Transférer' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Donner l’accès au portail' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Archiver' })).toBeNull();
   });
 });

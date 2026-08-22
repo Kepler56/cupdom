@@ -8,7 +8,6 @@ import { TaskList } from './TaskList';
 import { ReminderList } from './ReminderList';
 import { LinkList } from './LinkList';
 import { HistoriqueTab } from './HistoriqueTab';
-import { Button } from '@/components/atoms/Button';
 import { ContactForm } from '@/components/molecules/ContactForm';
 import { TransferDialog } from '@/components/molecules/TransferDialog';
 import { ArchiveContactDialog } from '@/components/molecules/ArchiveContactDialog';
@@ -78,15 +77,10 @@ export function ContactHub({ contactId }: { contactId: string }) {
         onEdit={() => setEditing(true)}
         onTransfer={() => setTransferOpen(true)}
         onArchive={() => setArchiveOpen(true)}
+        onPortalAccess={() => setPortalOpen(true)}
       />
 
       <div>
-        <div className="mb-4 flex justify-end">
-          <Button size="sm" variant="secondary" onClick={() => setPortalOpen(true)}>
-            Donner l’accès au portail
-          </Button>
-        </div>
-
         <div className="mb-4 flex gap-1 border-b border-border">
           {TABS.map((t) => (
             <button

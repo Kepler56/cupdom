@@ -17,6 +17,7 @@ interface ContactHubProfileProps {
   onEdit: () => void;
   onTransfer: () => void;
   onArchive: () => void;
+  onPortalAccess: () => void;
 }
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
@@ -39,7 +40,7 @@ function Line({ icon, value }: { icon: LucideIcon; value: string | null }) {
   );
 }
 
-export function ContactHubProfile({ contact, onEdit, onTransfer, onArchive }: ContactHubProfileProps) {
+export function ContactHubProfile({ contact, onEdit, onTransfer, onArchive, onPortalAccess }: ContactHubProfileProps) {
   const canEdit = useCanEdit(contact.ownerId);
   const { profiles } = useProfiles();
   const owner = profiles[contact.ownerId];
@@ -85,6 +86,9 @@ export function ContactHubProfile({ contact, onEdit, onTransfer, onArchive }: Co
           </Button>
           <Button size="sm" variant="secondary" onClick={onTransfer}>
             Transférer
+          </Button>
+          <Button size="sm" variant="secondary" onClick={onPortalAccess}>
+            Donner l’accès au portail
           </Button>
           <Button size="sm" variant="danger-outline" onClick={onArchive}>
             Archiver
