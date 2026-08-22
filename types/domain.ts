@@ -269,6 +269,8 @@ export interface Campaign {
   dealId: string | null;        // FK → deals.id (null = legacy/unlinked, managed by old index.html)
   distributedCount: number | null; // owner-entered "Distribués" funnel input (Spec 3 reads this)
   createdAt: string;            // ISO
+  investedAmountEur: number | null; // owner-entered spend; drives the portal's cost-per-contact tile (Spec 5 §4.7)
+  venue: string | null;         // owner-entered "Lieu / événement"; unlocks the portal's venue ranking (Spec 5 §4.8)
 }
 
 // ── Campaign event log (Spec 2A §2/§6) ──────────────────────────────────────

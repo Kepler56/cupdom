@@ -7,6 +7,8 @@ import { Icon } from '@/components/atoms/Icon';
 import { OwnerChip } from '@/components/molecules/OwnerChip';
 import { CampaignStateBadge } from '@/components/molecules/CampaignStateBadge';
 import { DistributedInput } from '@/components/molecules/DistributedInput';
+import { InvestedAmountInput } from '@/components/molecules/InvestedAmountInput';
+import { VenueInput } from '@/components/molecules/VenueInput';
 import { scanUrl } from '@/lib/campaigns/redirectUrl';
 import type { CampaignWithOwner } from '@/lib/campaigns/campaigns';
 
@@ -21,8 +23,12 @@ interface CampaignDetailHeaderProps {
 
 /**
  * Campaign detail header (Spec 4 AC-9): name · état badge · slug (+ public /s/ hint) · Télécharger QR
- * (read-only-safe) · Désactiver/Réactiver + Distribués (owner only). Off-scope shows an OwnerChip and
- * hides the lifecycle controls (AC-4).
+ * (read-only-safe) · Désactiver/Réactiver + Distribués, Montant investi, Lieu / événement (owner only).
+ * Off-scope shows an OwnerChip and hides the lifecycle controls (AC-4).
+ *
+ * Montant investi and Lieu / événement are the portal's only inputs for the cost-per-contact
+ * tile and venue ranking (Spec 5 §4.7/§4.8) — see InvestedAmountInput's doc comment for the
+ * "every campaign must carry an amount" rule that makes the cost tile all-or-nothing.
  */
 export function CampaignDetailHeader({ campaign, canEdit, ownerName, ownerColor, onToggle, onShowQr }: CampaignDetailHeaderProps) {
   const [busy, setBusy] = useState(false);
@@ -48,6 +54,8 @@ export function CampaignDetailHeader({ campaign, canEdit, ownerName, ownerColor,
         </p>
         <p className="font-mono text-xs text-text-faint">{scanUrl(campaign.slug)}</p>
         {canEdit && <DistributedInput slug={campaign.slug} value={campaign.distributedCount} canEdit={canEdit} />}
+        {canEdit && <InvestedAmountInput slug={campaign.slug} value={campaign.investedAmountEur} canEdit={canEdit} />}
+        {canEdit && <VenueInput slug={campaign.slug} value={campaign.venue} canEdit={canEdit} />}
       </div>
 
       <div className="flex items-center gap-2">

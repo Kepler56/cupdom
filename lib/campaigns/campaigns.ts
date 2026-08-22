@@ -21,13 +21,15 @@ type CampaignRow = {
   deal_id: string | null;
   distributed_count: number | null;
   created_at: string;
+  invested_amount_eur: number | null;
+  venue: string | null;
 };
 
 type JoinedRow = CampaignRow & {
   deals: { title: string | null; contacts: { owner_id: string; company: string | null } | null } | null;
 };
 
-const COLS = 'slug, sponsor_name, name, product, destination_url, active, deal_id, distributed_count, created_at';
+const COLS = 'slug, sponsor_name, name, product, destination_url, active, deal_id, distributed_count, created_at, invested_amount_eur, venue';
 const JOIN_COLS = `${COLS}, deals(title, contacts(owner_id, company))`;
 
 function mapCampaign(r: CampaignRow): Campaign {
@@ -41,6 +43,8 @@ function mapCampaign(r: CampaignRow): Campaign {
     dealId: r.deal_id,
     distributedCount: r.distributed_count,
     createdAt: r.created_at,
+    investedAmountEur: r.invested_amount_eur,
+    venue: r.venue,
   };
 }
 
@@ -170,6 +174,30 @@ export async function setDistributedCount(slug: string, n: number | null): Promi
   const supabase = createClient();
   const { error } = await supabase.from('qr_campaigns').update({ distributed_count: n }).eq('slug', slug);
   if (error) throw error;
+}
+
+/**
+ * « Montant investi » — the one input behind the portal's cost-per-contact tile
+ * (Spec 5 §4.7). Deliberately distinct from deals.value_eur: that figure is a
+ * sales number and must never leak to a sponsor automatically.
+ *
+ * null CLEARS it. Zero does not: zero would render « 0,00 € par contact », which
+ * claims the campaign was free. Absent and free are different statements.
+ */
+export async function setInvestedAmount(slug: string, amount: number | null): Promise<void> {
+  await createClient().from('qr_campaigns').update({ invested_amount_eur: amount }).eq('slug', slug);
+}
+
+/**
+ * « Lieu / événement » — unlocks the portal's venue ranking (Spec 5 §4.8).
+ *
+ * Trimmed, and an empty string becomes null: the ranking groups by this value,
+ * so « Rex Club » and « Rex Club » with a trailing space would render as two
+ * separate venues, and '' would render as an unnamed row.
+ */
+export async function setVenue(slug: string, venue: string | null): Promise<void> {
+  const cleaned = venue?.trim() ?? '';
+  await createClient().from('qr_campaigns').update({ venue: cleaned === '' ? null : cleaned }).eq('slug', slug);
 }
 
 /** Delete a campaign. The DB guard blocks deletion once it has any scan → reason 'has_scans'. */

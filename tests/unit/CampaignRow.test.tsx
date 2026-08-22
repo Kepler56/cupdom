@@ -17,6 +17,8 @@ const base: CampaignRowVM = {
   dealId: 'd1',
   distributedCount: null,
   createdAt: '2026-06-01T00:00:00Z',
+  investedAmountEur: null,
+  venue: null,
   ownerId: 'o1',
   ownerName: 'Eliah',
   ownerColor: '#f00',

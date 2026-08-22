@@ -13,6 +13,8 @@ const existing: Campaign = {
   dealId: 'd1',
   distributedCount: null,
   createdAt: '2026-01-01T00:00:00Z',
+  investedAmountEur: null,
+  venue: null,
 };
 
 describe('DuplicateDestinationDialog', () => {
