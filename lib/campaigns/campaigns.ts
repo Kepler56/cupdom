@@ -183,9 +183,17 @@ export async function setDistributedCount(slug: string, n: number | null): Promi
  *
  * null CLEARS it. Zero does not: zero would render « 0,00 € par contact », which
  * claims the campaign was free. Absent and free are different statements.
+ *
+ * Clamped to >= 0 here rather than only in the input: a negative amount would
+ * feed the portal's cost-per-contact tile, which a paying sponsor reads, and
+ * `invested_amount_eur` carries no CHECK constraint — this is the only guard.
+ * A negative figure is treated as an entry error (typo, paste), not a request
+ * to clear the field, so it clamps to 0 rather than becoming null.
  */
 export async function setInvestedAmount(slug: string, amount: number | null): Promise<void> {
-  await createClient().from('qr_campaigns').update({ invested_amount_eur: amount }).eq('slug', slug);
+  const safe = amount === null ? null : Math.max(0, amount);
+  const { error } = await createClient().from('qr_campaigns').update({ invested_amount_eur: safe }).eq('slug', slug);
+  if (error) throw error;
 }
 
 /**
@@ -197,7 +205,8 @@ export async function setInvestedAmount(slug: string, amount: number | null): Pr
  */
 export async function setVenue(slug: string, venue: string | null): Promise<void> {
   const cleaned = venue?.trim() ?? '';
-  await createClient().from('qr_campaigns').update({ venue: cleaned === '' ? null : cleaned }).eq('slug', slug);
+  const { error } = await createClient().from('qr_campaigns').update({ venue: cleaned === '' ? null : cleaned }).eq('slug', slug);
+  if (error) throw error;
 }
 
 /** Delete a campaign. The DB guard blocks deletion once it has any scan → reason 'has_scans'. */
