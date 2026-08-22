@@ -43,3 +43,20 @@ export function generatePassword(random: Uint8Array): string {
   // from a 16-character one without counting, and the failure would be silent.
   throw new Error('not enough entropy supplied');
 }
+
+/**
+ * The codes GoTrue uses when the address is already taken.
+ *
+ * Matched on `code`, never on `message`: the message is English prose that
+ * changes between library versions, and if it ever stopped matching, the
+ * « offer a password reset instead » path Spec §5.9 requires by name would
+ * silently become a bare 500. These codes are documented and stable.
+ */
+export const AUTH_USER_EXISTS_CODES: readonly string[] = Object.freeze([
+  'email_exists',
+  'user_already_exists',
+]);
+
+export function isAuthUserExistsError(error: { code?: string | null } | null | undefined): boolean {
+  return error?.code != null && AUTH_USER_EXISTS_CODES.includes(error.code);
+}

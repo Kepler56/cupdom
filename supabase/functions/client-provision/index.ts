@@ -11,7 +11,7 @@
 // The generated password is returned once and never stored, logged or emailed.
 // Not part of the Next typecheck (Deno globals + URL imports) — excluded in tsconfig.
 import { createClient } from '@supabase/supabase-js';
-import { generatePassword, RANDOM_BYTES_NEEDED } from '../_shared/provision.ts';
+import { generatePassword, isAuthUserExistsError, RANDOM_BYTES_NEEDED } from '../_shared/provision.ts';
 
 // deno-lint-ignore no-explicit-any
 type Json = any;
@@ -82,8 +82,9 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
   if (createError) {
     // An existing auth user is the one collision worth naming: the CRM offers a
-    // password reset instead of failing opaquely (Spec §5.9).
-    const already = /already|exist|registered/i.test(createError.message ?? '');
+    // password reset instead of failing opaquely (Spec §5.9). Matched on the
+    // structured `code` field, never the message — see provision.ts.
+    const already = isAuthUserExistsError(createError);
     return json({ ok: false, error: already ? 'auth_user_exists' : 'unknown' }, already ? 409 : 500);
   }
 
@@ -98,7 +99,12 @@ Deno.serve(async (req: Request): Promise<Response> => {
   if (insertError) {
     // Do not leave an orphan auth user behind: it would block every later
     // attempt with 'auth_user_exists' and nobody could tell why.
-    await service.auth.admin.deleteUser(created.user!.id);
+    const { error: cleanupError } = await service.auth.admin.deleteUser(created.user!.id);
+    if (cleanupError) {
+      // An orphan auth user now exists and will make every later attempt for
+      // this sponsor look like a collision. Log it so the cause is findable.
+      console.error('[client-provision] orphan cleanup failed:', cleanupError.code, cleanupError.message);
+    }
     console.error('[client-provision] insert failed:', insertError.code, insertError.message);
     return json({ ok: false, error: 'unknown' }, 500);
   }
