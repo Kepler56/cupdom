@@ -37,6 +37,7 @@
   "exclude": [
     "node_modules",
     "supabase/functions/daily-digest/index.ts",
-    "supabase/functions/lead-submit/index.ts"
+    "supabase/functions/lead-submit/index.ts",
+    "supabase/functions/client-provision/index.ts"
   ]
 }
