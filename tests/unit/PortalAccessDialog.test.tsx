@@ -79,6 +79,23 @@ describe('PortalAccessDialog', () => {
     expect(resetPortalPassword).toHaveBeenCalledWith('c1');
   });
 
+  it('reports a reissue to its caller, also without the password', async () => {
+    // contact_history is storage, and Spec §5.9 says the password is never
+    // stored — so a reset's summary is subject to the same rule as a grant's.
+    grantPortalAccess.mockResolvedValue({ ok: false, reason: 'auth_user_exists', message: 'Un compte existe déjà.' });
+    resetPortalPassword.mockResolvedValue({ ok: true, email: 'nike@example.test', password: 'ZzYyXxWwVvUuTtSs' });
+    open();
+    await userEvent.click(screen.getByRole('button', { name: /Donner l’accès/ }));
+    await screen.findByRole('alert');
+    await userEvent.click(screen.getByRole('button', { name: /Réinitialiser/ }));
+    await screen.findByText('ZzYyXxWwVvUuTtSs');
+
+    expect(onGranted).toHaveBeenCalledTimes(1);
+    const summary = onGranted.mock.calls[0][0];
+    expect(summary).not.toContain('ZzYyXxWwVvUuTtSs');
+    expect(summary).toMatch(/réinitialisé/i);
+  });
+
   it('surfaces a warning alongside a password that did change', async () => {
     resetPortalPassword.mockResolvedValue({
       ok: true,

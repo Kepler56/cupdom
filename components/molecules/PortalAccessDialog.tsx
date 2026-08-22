@@ -9,6 +9,11 @@ interface PortalAccessDialogProps {
   contactId: string;
   contactName: string;
   onClose: () => void;
+  /**
+   * Reports an access event so the caller can write it to contact_history —
+   * fires on an initial grant AND on a later reset/reissue, each with its own
+   * password-free summary. It never receives the password.
+   */
   onGranted: (summary: string) => void;
 }
 
@@ -51,6 +56,7 @@ export function PortalAccessDialog({ contactId, contactName, onClose, onGranted 
     if (res.ok) {
       setResult(res);
       setCanReset(false);
+      onGranted(`Mot de passe du portail réinitialisé — ${res.email}`);
     } else {
       setError(res.message);
     }
@@ -60,7 +66,7 @@ export function PortalAccessDialog({ contactId, contactName, onClose, onGranted 
     <div
       role="dialog"
       aria-modal="true"
-      aria-label="Donner l’accès au portail"
+      aria-label="Accès au portail"
       className="fixed inset-0 z-50 flex items-center justify-center bg-text/30 p-4"
     >
       <div className="w-full max-w-sm rounded-card border border-border bg-surface p-6 shadow-lg">
