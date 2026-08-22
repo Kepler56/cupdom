@@ -217,6 +217,25 @@ export type LifecycleResult =
   | { ok: true }
   | { ok: false; reason: 'not_owner' | 'active_campaign' | 'not_archived' | 'unknown'; message: string };
 
+// Portal provisioning (Spec 5 §5.9). A sibling of LifecycleResult rather than a
+// widening of it: four call sites depend on that union's reasons, and none of
+// them can mean 'auth_user_exists'. EraseLeadResult sets the same precedent.
+export type PortalAccessResult =
+  | { ok: true; email: string; password: string; warning?: string }
+  | {
+      ok: false;
+      reason:
+        | 'not_member'
+        | 'not_owner'
+        | 'auth_user_exists'
+        | 'already_provisioned'
+        | 'not_provisioned'
+        | 'contact_has_no_email'
+        | 'unavailable'
+        | 'unknown';
+      message: string;
+    };
+
 // ── CSV export (Spec 1F §5.11) ──────────────────────────────────────────────
 export type DatasetId = 'contacts' | 'deals' | 'tasks' | 'campaigns' | 'scan_leads';
 
