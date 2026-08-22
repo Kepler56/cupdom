@@ -19,30 +19,38 @@
 
 do $$
 declare
-  v_name text;
+  r record;
 begin
-  select con.conname
-    into v_name
-  from pg_constraint con
-  join pg_class rel on rel.oid = con.conrelid
-  join pg_namespace nsp on nsp.oid = rel.relnamespace
-  where nsp.nspname = 'public'
-    and rel.relname = 'contact_history'
-    and con.contype = 'c'
-    and pg_get_constraintdef(con.oid) ilike '%kind%'
-  limit 1;
+  -- Drop EVERY check constraint guarding this column, not merely the first
+  -- found: the live one was created by hand and we cannot assume there is
+  -- exactly one, nor what it is called.
+  for r in
+    select con.conname
+    from pg_constraint con
+    join pg_class rel on rel.oid = con.conrelid
+    join pg_namespace nsp on nsp.oid = rel.relnamespace
+    where nsp.nspname = 'public'
+      and rel.relname = 'contact_history'
+      and con.contype = 'c'
+      and pg_get_constraintdef(con.oid) ilike '%kind%'
+  loop
+    execute format('alter table public.contact_history drop constraint %I', r.conname);
+  end loop;
 
-  if v_name is not null then
-    execute format('alter table public.contact_history drop constraint %I', v_name);
-  end if;
+  -- Inside the SAME block as the drops, deliberately. A do-block is a single
+  -- statement, so if this add fails — a stray existing value, a name collision —
+  -- every drop above rolls back with it and the column is never left unguarded.
+  -- Two top-level statements would leave that window open and depend on the SQL
+  -- client wrapping the script in a transaction, which the file cannot assume.
+  execute $ct$
+    alter table public.contact_history
+      add constraint contact_history_kind_check check (kind in (
+        'deal_stage', 'transfer', 'contact_edit', 'task', 'reminder', 'link',
+        'archive', 'restore', 'portal_access'
+      ))
+  $ct$;
 end;
 $$;
-
-alter table public.contact_history
-  add constraint contact_history_kind_check check (kind in (
-    'deal_stage', 'transfer', 'contact_edit', 'task', 'reminder', 'link',
-    'archive', 'restore', 'portal_access'
-  ));
 
 -- ------------------------------------------------------------
 -- Verify:
