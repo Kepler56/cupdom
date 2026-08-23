@@ -11,10 +11,16 @@
 -- is_cupdom_member(), 0006 ALTERs both qr_ tables. Applying 0001-0014 to an
 -- empty project therefore FAILED before this file existed.
 --
--- Numbered 0000 so it sorts first. ADDITIVE ONLY, idempotent, safe to re-run.
--- Against the existing production database every statement is a no-op; it
--- matters for a rebuild, and as the readable record of what the root security
--- predicate actually says.
+-- Numbered 0000 so it sorts first. Idempotent, safe to re-run.
+--
+-- Against the existing production database it is a no-op EXCEPT for the two
+-- grant blocks, which tighten `authenticated` down to the privileges the
+-- application uses — the same change 0016 makes, stated here so a REBUILD never
+-- reproduces the over-grant in the first place. If you apply this file to
+-- production you have effectively already applied 0016.
+--
+-- Beyond a rebuild, this file matters as the readable record of what the root
+-- security predicate actually says.
 --
 -- Depends on: nothing (this is the base).
 -- Later migrations add: 0006 -> qr_campaigns.deal_id/name/distributed_count,
