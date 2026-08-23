@@ -49,3 +49,44 @@ describe('campaign QR', () => {
     toBlob.mockRestore();
   });
 });
+
+/**
+ * CROSS-REPOSITORY GOLDEN — keep in sync with cupdom-dashboard.
+ *
+ * The portal renders a preview of the code physically printed on the cover, from
+ * its own copy of this logic (cupdom-dashboard/lib/qr.ts). There is no shared
+ * package between the two repositories, so nothing structurally prevents them
+ * from drifting apart — and a preview that scans differently from the object in
+ * the sponsor's hand is worse than no preview at all.
+ *
+ * Both repos pin the SAME digest for the SAME payload. If either side changes
+ * its base URL default, its error-correction level, its quiet zone, or starts
+ * percent-encoding the slug, exactly one of these two tests goes red and names
+ * the other repo.
+ *
+ * Recomputing the golden is a deliberate act: if you change it here, change it
+ * in cupdom-dashboard/tests/unit/qr.test.ts in the same commit.
+ */
+describe('cross-repo QR golden (must match cupdom-dashboard)', () => {
+  const PAYLOAD = 'https://cupdom.fr/s/demo-rex-club';
+  const GOLDEN_SIZE = 33;
+  const GOLDEN_SHA256 = '157424d28ebff982e854fbeb7fd548be8848fae69f19b371407289a103a1a1d5';
+
+  async function sha256Hex(input: string): Promise<string> {
+    const bytes = new TextEncoder().encode(input);
+    const digest = await crypto.subtle.digest('SHA-256', bytes);
+    return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');
+  }
+
+  it('scanUrl produces the golden payload', () => {
+    // Guards the half of the drift risk that has nothing to do with QR encoding:
+    // the origin default and the absence of percent-encoding.
+    expect(scanUrl('demo-rex-club')).toBe(PAYLOAD);
+  });
+
+  it('the module matrix matches the digest pinned in cupdom-dashboard', async () => {
+    const m = qrMatrix(PAYLOAD);
+    expect(m.size).toBe(GOLDEN_SIZE);
+    expect(await sha256Hex(serialize(m))).toBe(GOLDEN_SHA256);
+  });
+});

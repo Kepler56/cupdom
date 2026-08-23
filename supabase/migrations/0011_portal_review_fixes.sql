@@ -263,7 +263,8 @@ select proname, (length(prosrc) - length(replace(prosrc, 'client_slugs()', '')))
 from pg_proc
 where pronamespace = 'public'::regnamespace and proname = 'client_campaigns';
 
--- Expected: qr_campaigns still has exactly 4 policies (read/insert/update/delete);
+-- Expected: qr_campaigns has 5 policies — the 4 member ones
+-- (read/insert/update/delete) plus "qr_campaigns read client", added by 0009;
 -- update/delete policy bodies now start with "is_cupdom_member".
 select policyname, cmd, qual from pg_policies
 where schemaname = 'public' and tablename = 'qr_campaigns'

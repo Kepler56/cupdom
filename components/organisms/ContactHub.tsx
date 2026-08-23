@@ -153,7 +153,14 @@ export function ContactHub({ contactId }: { contactId: string }) {
             // The summary comes from the dialog and is built from the contact and
             // the e-mail — never from the password. contact_history is storage,
             // and Spec §5.9 says the password is never stored.
-            void appendHistory(contact.id, 'portal_access', summary).catch(() => {});
+            // Deliberately non-blocking: the Edge Function has already created the account
+            // and the password has been shown once, so a failed audit write must not undo or
+            // obscure that. But it must not be SILENT either — this is the record of who was
+            // given access to a sponsor's data, and it is the one contact_history write that
+            // can fail on a CHECK violation while migration 0014 is unapplied.
+            void appendHistory(contact.id, 'portal_access', summary).catch((err) => {
+              console.error('[portal] contact_history portal_access write failed:', err);
+            });
           }}
         />
       )}

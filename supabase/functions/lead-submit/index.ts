@@ -5,16 +5,11 @@
 // Not part of the Next typecheck (Deno globals + URL imports) — excluded in tsconfig.
 import { createClient } from '@supabase/supabase-js';
 import { isSpam, normaliseEmail, validateLead } from './validate.ts';
+import { CONSENT_TEXT_FR, CONSENT_VERSION } from './consent.ts';
+import { visitorDate } from './visitorDate.ts';
 
 // deno-lint-ignore no-explicit-any
 type Json = any;
-
-// PLACEHOLDER consent wording — kept identical to lib/public/consent.ts (DPO-pending, §12).
-// Re-derived server-side and stored verbatim so a tampered client payload can't change it (AC-9).
-const CONSENT_VERSION = 'v1-2026-06';
-const CONSENT_TEXT_FR = (sponsor: string): string =>
-  `J'accepte que mes données soient traitées par Cupdom et partagées avec ${sponsor} ` +
-  `afin de recevoir cette offre et des communications marketing.`;
 
 const CORS = {
   'Access-Control-Allow-Origin': Deno.env.get('LEAD_FORM_ORIGIN') ?? '*', // restrict to prod origin pre-launch (Task 6)
@@ -63,8 +58,10 @@ Deno.serve(async (req: Request): Promise<Response> => {
   // Anonymous best-effort visitor hash (no IP stored), consistent with scan.js dedup.
   const ip = req.headers.get('x-forwarded-for')?.split(',')[0].trim() ?? '';
   const ua = req.headers.get('user-agent') ?? '';
-  const utcDate = new Date().toISOString().slice(0, 10);
-  const visitorHash = await sha256Hex([ip, ua, slug, secret, utcDate].join('|'));
+  // Europe/Paris, NOT UTC — this must match scan.js, which keys its visitor_hash the same way.
+  // A UTC date rolls over at 23:00/22:00 Paris, mid-evening, so one person scanning either side of
+  // it would produce two hashes and count as two people in every count(distinct visitor_hash).
+  const visitorHash = await sha256Hex([ip, ua, slug, secret, visitorDate(new Date())].join('|'));
 
   // ---- form_view ping (AC-3): log the view if Active, and tell the page whether to render. ----
   if (payload.kind === 'form_view') {

@@ -24,12 +24,19 @@
  *   TEST_MEMBER_A_EMAIL / TEST_MEMBER_A_PASSWORD
  * Skipped entirely when that env is absent, same as the rest of this suite.
  *
- * Additionally, migration 0014 itself is — as of this writing — deliberately
- * unapplied; the product owner runs it by hand (see the stage 5 provisioning
- * plan's task-8 brief). A beforeAll probe detects whether 'portal_access' is
- * accepted yet and every test below skips cleanly via ctx.skip() when it is
- * not, rather than failing the suite for a reason that is not the product
- * owner's fault. Run: pnpm test:rls
+ * Additionally, migration 0014 itself was deliberately left unapplied when this
+ * suite was written; the product owner runs it by hand (see the stage 5
+ * provisioning plan's task-8 brief). A beforeAll probe detects whether
+ * 'portal_access' is accepted yet, and the four behavioural assertions below
+ * still skip cleanly via ctx.skip() when it is not — five confusing failures
+ * help nobody.
+ *
+ * BUT THE GAP ITSELF NOW FAILS, in one dedicated test. Verified against
+ * production on 2026-08-23: 0014 is STILL unapplied, and the live constraint
+ * permits only eight values. That is not a neutral pending task —
+ * components/organisms/ContactHub.tsx writes kind='portal_access' after every
+ * portal grant, so each grant currently loses its audit row. A silent skip is
+ * how that stayed invisible for months. Run: pnpm test:rls
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
@@ -89,26 +96,39 @@ describe.skipIf(!configured)('contact_history.kind reconciliation (migration 001
     if (contactId) await member.from('contacts').delete().eq('id', contactId);
   });
 
+  // This one does NOT skip. It is the whole point: the suite must say out loud that a
+  // migration the application depends on is missing, rather than reporting a tidy set of
+  // skips that reads like a pass.
+  it('migration 0014 IS APPLIED — otherwise every portal grant loses its audit row', () => {
+    expect(
+      migrationApplied,
+      "contact_history.kind rejects 'portal_access', so migration 0014 has not been applied. " +
+        'ContactHub.tsx writes that kind after every successful portal grant and swallows the ' +
+        'failure, so the access is granted but the audit row is silently lost. ' +
+        'Apply supabase/migrations/0014_portal_history_kind.sql, then re-run.',
+    ).toBe(true);
+  });
+
   it("kind = 'portal_access' inserts — the value stage 5 needs", async (ctx) => {
-    ctx.skip(!migrationApplied, 'migration 0014 not applied yet — see task-8 brief');
+    ctx.skip(!migrationApplied, 'migration 0014 not applied yet — see the failing test above');
     const { error } = await insertKind('portal_access');
     expect(error).toBeNull();
   });
 
   it("kind = 'archive' still inserts — the CRM archive feature must not regress", async (ctx) => {
-    ctx.skip(!migrationApplied, 'migration 0014 not applied yet — see task-8 brief');
+    ctx.skip(!migrationApplied, 'migration 0014 not applied yet — see the failing test above');
     const { error } = await insertKind('archive');
     expect(error).toBeNull();
   });
 
   it("kind = 'restore' still inserts — the CRM archive feature must not regress", async (ctx) => {
-    ctx.skip(!migrationApplied, 'migration 0014 not applied yet — see task-8 brief');
+    ctx.skip(!migrationApplied, 'migration 0014 not applied yet — see the failing test above');
     const { error } = await insertKind('restore');
     expect(error).toBeNull();
   });
 
   it("kind = 'definitely_not_a_kind' is REJECTED — proves the constraint still constrains", async (ctx) => {
-    ctx.skip(!migrationApplied, 'migration 0014 not applied yet — see task-8 brief');
+    ctx.skip(!migrationApplied, 'migration 0014 not applied yet — see the failing test above');
     const { data, error } = await insertKind('definitely_not_a_kind');
     expect(error).not.toBeNull();
     expect(error!.code).toBe(CHECK_VIOLATION);
