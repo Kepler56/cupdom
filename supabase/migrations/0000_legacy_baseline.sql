@@ -79,6 +79,15 @@ alter table public.qr_campaigns enable row level security;
 -- tightened by 0011 (is_cupdom_member guard on UPDATE/DELETE). Deliberately not
 -- duplicated here — one definition, in the migration that reasons about it.
 
+-- GRANTS. Production was found (2026-08-23) holding the FULL privilege set for
+-- `authenticated` here — SELECT/INSERT/UPDATE/DELETE plus REFERENCES, TRIGGER
+-- and TRUNCATE, inherited from supabase_qr_sql.md's `grant all`. That is NOT
+-- reproduced: a rebuild should not recreate a mistake that 0016 then has to
+-- undo. These are the privileges the application actually uses; 0016 revokes
+-- the extras on the existing database.
+revoke all on public.qr_campaigns from anon, authenticated;
+grant select, insert, update, delete on public.qr_campaigns to authenticated;
+
 -- ------------------------------------------------------------
 -- 3. qr_scans — one row per scan. Written ONLY by the Netlify edge function
 --    netlify/edge-functions/scan.js, using the service-role key.
@@ -131,6 +140,12 @@ alter table public.qr_scans enable row level security;
 drop policy if exists "qr_scans members read" on public.qr_scans;
 create policy "qr_scans members read" on public.qr_scans
   for select to authenticated using (public.is_cupdom_member());
+
+-- Read-only for members; every write is the service-role edge function. As
+-- above, production was found with a full `grant all` here — including TRUNCATE,
+-- which RLS does NOT gate. See 0016.
+revoke all on public.qr_scans from anon, authenticated;
+grant select on public.qr_scans to authenticated;
 
 -- ------------------------------------------------------------
 -- 4. crm_data — DEAD. The legacy single-table blob from the original one-file
@@ -199,8 +214,12 @@ where schemaname = 'public' and tablename in ('qr_scans','funnel_events')
   and policyname ilike '%client%';
 
 -- ------------------------------------------------------------
--- STILL UNVERIFIED — the two things introspection did not cover. Run these and
--- reconcile this file if they disagree.
+-- GRANTS: ANSWERED 2026-08-23. `anon` holds nothing on any of the three tables
+-- (correct), and crm_data is fully revoked (0010 worked). `authenticated` held
+-- a full `grant all` on both qr_ tables — see 0016, which tightens it.
+--
+-- STILL UNVERIFIED: the FK delete rule. This file assumes ON DELETE CASCADE, as
+-- CLAUDE.md documents. Run the query below and reconcile if it disagrees.
 -- ------------------------------------------------------------
 -- 1. FK delete rule. This file assumes CASCADE (as CLAUDE.md documents).
 --    Expect: qr_scans.campaign_slug -> qr_campaigns.slug, delete_rule = CASCADE.
@@ -213,9 +232,9 @@ join information_schema.referential_constraints rc on rc.constraint_name = tc.co
 where tc.constraint_type = 'FOREIGN KEY' and tc.table_schema = 'public'
   and tc.table_name in ('qr_scans','qr_campaigns');
 
--- 2. Table grants. Expect: anon holds NOTHING on any of the three;
---    authenticated holds select/insert/update/delete on qr_campaigns,
---    select on qr_scans, and NOTHING on crm_data (revoked by 0010).
+-- 2. Table grants — AFTER 0016 has been applied. Expect exactly five rows:
+--    qr_campaigns/authenticated SELECT+INSERT+UPDATE+DELETE, qr_scans/
+--    authenticated SELECT. No TRUNCATE, no anon, nothing on crm_data.
 select table_name, grantee, privilege_type
 from information_schema.role_table_grants
 where table_schema = 'public'
