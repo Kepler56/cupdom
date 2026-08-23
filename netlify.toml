@@ -9,6 +9,21 @@
 [build.environment]
   NODE_VERSION = "20"
 
+  # QR_FALLBACK_URL is marked "contains secret values" in the Netlify UI, but its
+  # value is https://cupdom.fr — the public origin printed on the physical
+  # product and encoded into every QR code. It is not a secret and cannot be one.
+  #
+  # Because it is flagged, Netlify's secrets scanner fails the build whenever that
+  # string appears in the repo or build output — which it does, legitimately: it is
+  # the default in lib/campaigns/redirectUrl.ts#scanBase() and it appears in the
+  # QR golden test. Omitting the KEY (not a path) keeps scanning active for
+  # everything else, including QR_DAILY_SECRET and SUPABASE_SERVICE_ROLE_KEY,
+  # which genuinely are secrets.
+  #
+  # Better still: un-tick "Contains secret values" for QR_FALLBACK_URL in the UI.
+  # This line makes the build independent of that setting either way.
+  SECRETS_SCAN_OMIT_KEYS = "QR_FALLBACK_URL"
+
 [[plugins]]
   package = "@netlify/plugin-nextjs"
 
