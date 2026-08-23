@@ -1,0 +1,18 @@
+# Configuration Supabase CLI.
+#
+# verify_jwt : par défaut, la passerelle Edge exige un en-tête Authorization
+# valide AVANT d'exécuter la fonction. C'est le bon défaut pour les fonctions
+# appelées depuis le CRM (le membre connecté envoie son JWT de session), mais
+# c'est fatal pour `lead-submit`, qui est appelée par le formulaire PUBLIC.
+#
+# Ce formulaire ne détient aucune clé — c'est délibéré, il est servi à n'importe
+# quel téléphone qui scanne un couvercle — donc il n'envoie aucun en-tête. La
+# passerelle répondait 401, et lib/public/leadClient.ts traite toute erreur
+# comme « campagne inactive » : chaque scan affichait « Cette campagne n'est
+# plus active » au lieu du formulaire. Aucun contact ne pouvait être capté.
+#
+# La fonction reste protégée par sa propre logique : honeypot, validation du
+# slug, revérification serveur du statut Active, et la clé service-role qui ne
+# quitte jamais le serveur.
+[functions.lead-submit]
+verify_jwt = false
