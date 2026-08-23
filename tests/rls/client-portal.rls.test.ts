@@ -113,7 +113,15 @@ describe.skipIf(!configured)('Spec 5 client portal RLS — positive space', () =
   });
 
   afterAll(async () => {
-    if (svc && seededSlugs.length) await svc.from('qr_campaigns').delete().in('slug', seededSlugs);
+    if (svc && seededSlugs.length) {
+      // qr_scans must go first: guard_campaign_delete() raises (and aborts the
+      // whole delete...in(...) statement) if a campaign being deleted still has
+      // qr_scans rows, which would leave every seeded campaign behind.
+      const scansDel = await svc.from('qr_scans').delete().in('campaign_slug', seededSlugs);
+      if (scansDel.error) throw new Error(`qr_scans cleanup failed: ${scansDel.error.message}`);
+      const campaignsDel = await svc.from('qr_campaigns').delete().in('slug', seededSlugs);
+      if (campaignsDel.error) throw new Error(`qr_campaigns cleanup failed: ${campaignsDel.error.message}`);
+    }
     await destroyTestClient(svc, portal);
     if (svc && contactId) await svc.from('contacts').delete().eq('id', contactId);
   });
@@ -381,11 +389,14 @@ describe.skipIf(!configured)('Spec 5 client portal RLS — positive space', () =
   });
 
   it('a member calling the session RPCs changes nothing', async () => {
-    const before = await svc
+    // The previous test leaves must_change_password = false, which is also what
+    // client_mark_password_changed() sets — so asserting "unchanged" against a
+    // false baseline would pass even if the RPC updated every row in the table.
+    // Force it back to true here so an unscoped UPDATE actually fails this test.
+    await svc
       .from('client_accounts')
-      .select('must_change_password')
-      .eq('auth_user_id', portal!.authUserId)
-      .single();
+      .update({ must_change_password: true })
+      .eq('auth_user_id', portal!.authUserId);
 
     await member.rpc('client_mark_password_changed'); // no row matches auth.uid()
 
@@ -394,6 +405,6 @@ describe.skipIf(!configured)('Spec 5 client portal RLS — positive space', () =
       .select('must_change_password')
       .eq('auth_user_id', portal!.authUserId)
       .single();
-    expect(after.data!.must_change_password).toBe(before.data!.must_change_password);
+    expect(after.data!.must_change_password).toBe(true);
   });
 });

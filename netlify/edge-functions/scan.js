@@ -1,4 +1,4 @@
-import { parseUserAgent, detectBot, buildVisitorHash, utcDate } from './lib/detect.mjs';
+import { parseUserAgent, detectBot, buildVisitorHash, visitorDate } from './lib/detect.mjs';
 
 // Public scan behaviour (Spec 2 §7):
 //   slug exists & active=true  -> 302 to the lead form /c/<slug> (Spec 3A); log ONE scan tagged 'Active'
@@ -53,7 +53,7 @@ export default async (request, context) => {
   const is_bot = detectBot(ua);
   const geo = context.geo || {};
   const visitor_hash = await buildVisitorHash({
-    ip: context.ip, ua, slug, secret: DAILY_SECRET, date: utcDate(new Date()),
+    ip: context.ip, ua, slug, secret: DAILY_SECRET, date: visitorDate(new Date()),
   });
 
   const campaign_state_at_scan = isActive ? 'Active' : 'Terminée';

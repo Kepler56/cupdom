@@ -75,6 +75,10 @@ describe.skipIf(!configured)('Spec 5 client portal RLS — isolation', () => {
       if (lead.error) throw new Error(`lead ${tag} insert failed: ${lead.error.message}`);
       const scan = await svc.from('qr_scans').insert({ campaign_slug: slug, is_bot: false, visitor_hash: `v-${tag}` });
       if (scan.error) throw new Error(`scan ${tag} insert failed: ${scan.error.message}`);
+      const funnelEvent = await svc
+        .from('funnel_events')
+        .insert({ campaign_slug: slug, kind: 'form_view', visitor_hash: `f-${tag}` });
+      if (funnelEvent.error) throw new Error(`funnel_event ${tag} insert failed: ${funnelEvent.error.message}`);
 
       if (tag === 'A') {
         contactA = contact.data!.id;
@@ -95,19 +99,31 @@ describe.skipIf(!configured)('Spec 5 client portal RLS — isolation', () => {
   });
 
   afterAll(async () => {
-    if (svc && seededSlugs.length) {
-      // qr_scans must go first: guard_campaign_delete() raises (and aborts the
-      // whole delete...in(...) statement) if a campaign being deleted still has
-      // qr_scans rows, which would leave every seeded campaign behind.
-      const scansDel = await svc.from('qr_scans').delete().in('campaign_slug', seededSlugs);
-      if (scansDel.error) throw new Error(`qr_scans cleanup failed: ${scansDel.error.message}`);
-      const campaignsDel = await svc.from('qr_campaigns').delete().in('slug', seededSlugs);
-      if (campaignsDel.error) throw new Error(`qr_campaigns cleanup failed: ${campaignsDel.error.message}`);
+    // The campaign/scan cleanup can throw (guard_campaign_delete, a failed
+    // delete...). If it does, the three destroyTestClient calls below still MUST
+    // run — otherwise a broken cleanup strands the auth users this suite created.
+    // Collect the error and rethrow after the finally block so the failure stays
+    // loud without skipping the auth-user teardown.
+    let cleanupError: Error | undefined;
+    try {
+      if (svc && seededSlugs.length) {
+        // qr_scans must go first: guard_campaign_delete() raises (and aborts the
+        // whole delete...in(...) statement) if a campaign being deleted still has
+        // qr_scans rows, which would leave every seeded campaign behind.
+        const scansDel = await svc.from('qr_scans').delete().in('campaign_slug', seededSlugs);
+        if (scansDel.error) throw new Error(`qr_scans cleanup failed: ${scansDel.error.message}`);
+        const campaignsDel = await svc.from('qr_campaigns').delete().in('slug', seededSlugs);
+        if (campaignsDel.error) throw new Error(`qr_campaigns cleanup failed: ${campaignsDel.error.message}`);
+      }
+    } catch (err) {
+      cleanupError = err instanceof Error ? err : new Error(String(err));
+    } finally {
+      await destroyTestClient(svc, clientA);
+      await destroyTestClient(svc, clientB);
+      await destroyTestClient(svc, inactive);
+      if (svc) await svc.from('contacts').delete().like('company', `${MARKER}%`);
     }
-    await destroyTestClient(svc, clientA);
-    await destroyTestClient(svc, clientB);
-    await destroyTestClient(svc, inactive);
-    if (svc) await svc.from('contacts').delete().like('company', `${MARKER}%`);
+    if (cleanupError) throw cleanupError;
   });
 
   it('client A cannot see client B\'s campaign', async () => {
@@ -118,6 +134,25 @@ describe.skipIf(!configured)('Spec 5 client portal RLS — isolation', () => {
   it('client A cannot see client B\'s leads', async () => {
     const { data } = await clientA!.client.from('leads').select('id').eq('campaign_slug', slugB);
     expect(data ?? []).toHaveLength(0);
+  });
+
+  it('client A calling an RPC with client B\'s real slug is refused (Spec §7.2)', async () => {
+    // The other refusal tests in this suite (and in client-portal.rls.test.ts) all
+    // pass an ORPHAN slug — a campaign with deal_id IS NULL, unowned by everyone.
+    // That proves the unlinked case, never sponsor-vs-sponsor. This is the
+    // assertion that one paying sponsor cannot read another's data through the
+    // RPC surface: client A calls with client B's real, owned slug.
+    const funnel = await clientA!.client.rpc('client_funnel', { p_slug: slugB });
+    expect(funnel.error).not.toBeNull();
+    expect(funnel.error!.message).toContain('accès refusé');
+
+    const daily = await clientA!.client.rpc('client_scans_daily', {
+      p_from: '2000-01-01T00:00:00Z',
+      p_to: '2100-01-01T00:00:00Z',
+      p_slug: slugB,
+    });
+    expect(daily.error).not.toBeNull();
+    expect(daily.error!.message).toContain('accès refusé');
   });
 
   it('a client cannot read raw qr_scans or funnel_events at all', async () => {

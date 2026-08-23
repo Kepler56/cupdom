@@ -81,5 +81,13 @@ export async function destroyTestClient(
   // client_accounts cascades from auth.users, but delete explicitly so a failed
   // user-delete still leaves no orphan row.
   await svc.from('client_accounts').delete().eq('auth_user_id', account.authUserId);
-  await svc.auth.admin.deleteUser(account.authUserId);
+  // Wrapped: a failure deleting the auth user must not throw out of here and mask
+  // a more important error further up the caller's cleanup chain (e.g. the
+  // collected/rethrown campaign-cleanup error in client-portal-isolation's
+  // afterAll, which depends on every destroyTestClient call completing).
+  try {
+    await svc.auth.admin.deleteUser(account.authUserId);
+  } catch (err) {
+    console.warn(`destroyTestClient: deleteUser failed for ${account.email}:`, err);
+  }
 }

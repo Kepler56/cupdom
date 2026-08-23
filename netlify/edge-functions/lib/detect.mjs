@@ -35,8 +35,31 @@ export function parseUserAgent(ua) {
   return { device_type, os, browser };
 }
 
-export function utcDate(d) {
-  return d.toISOString().slice(0, 10); // 'YYYY-MM-DD' in UTC
+/**
+ * The date component of visitor_hash, in EUROPE/PARIS.
+ *
+ * This was the UTC date until 2026-08-18, and that silently inflated the client
+ * portal's « Personnes touchées » KPI. Every aggregate RPC buckets
+ * `at time zone 'Europe/Paris'`, so someone scanning at 00:30 and again at
+ * 03:00 on the SAME Paris night straddled a UTC date boundary, received two
+ * different hashes, and was counted as two people. Cupdom's product is used in
+ * nightclubs, so 00:00–02:00 Paris is peak trading — the overcount landed
+ * exactly where the data is densest.
+ *
+ * DELIBERATE SEAM: scans logged before this change are keyed on the UTC date and
+ * remain slightly over-counted for sessions crossing midnight Paris. Scans after
+ * it are correct. The dedupe window is still ONE DAY and still carries no
+ * cross-day identifier — the privacy property is unchanged, only the boundary
+ * moved.
+ */
+export function visitorDate(d) {
+  // 'en-CA' renders as YYYY-MM-DD, which is the format we want, in the named zone.
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Europe/Paris',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(d);
 }
 
 export async function buildVisitorHash({ ip, ua, slug, secret, date }) {

@@ -18,7 +18,10 @@ type Json = any;
 
 const CORS = {
   'Access-Control-Allow-Origin': Deno.env.get('CRM_ORIGIN') ?? '*',
-  'Access-Control-Allow-Headers': 'content-type, authorization',
+  // supabase-js `functions.invoke()` ALWAYS sends x-client-info and apikey.
+  // Omitting them here makes the browser's CORS preflight fail before the
+  // function is ever reached — in every browser, not just in development.
+  'Access-Control-Allow-Headers': 'content-type, authorization, apikey, x-client-info, x-supabase-api-version',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 

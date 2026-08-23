@@ -40,3 +40,6 @@ node_modules/
 # ── TypeScript build info ─────────────────────────────────
 *.tsbuildinfo
 next-env.d.ts
+
+# Supabase CLI scratch (project ref cache, pooler creds)
+supabase/.temp/
