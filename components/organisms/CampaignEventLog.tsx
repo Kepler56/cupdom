@@ -44,7 +44,7 @@ export function CampaignEventLog({ slug, onClose }: CampaignEventLogProps) {
       aria-label="Historique de la campagne"
       className="fixed inset-0 z-50 flex items-center justify-center bg-text/30 p-4"
     >
-      <div className="flex max-h-[80vh] w-full max-w-md flex-col rounded-card border border-border bg-surface p-6 shadow-lg">
+      <div className="flex max-h-[90dvh] w-full max-w-md flex-col rounded-card border border-border bg-surface p-5 shadow-lg sm:p-6">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-base font-semibold text-text">Historique</h2>
           <button type="button" onClick={onClose} aria-label="Fermer" className="text-text-muted hover:text-text">

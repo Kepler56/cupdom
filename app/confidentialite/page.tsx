@@ -22,7 +22,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 
 export default function ConfidentialitePage() {
   return (
-    <main className="mx-auto min-h-screen max-w-2xl bg-canvas px-5 py-10">
+    <main className="mx-auto min-h-dvh max-w-2xl bg-canvas px-4 py-8 sm:px-5 sm:py-10">
       <h1 className="mb-2 text-2xl font-semibold text-text">Politique de confidentialité</h1>
       <p className="mb-8 text-sm italic text-text-faint">
         Politique provisoire, en attente de validation par le DPO.

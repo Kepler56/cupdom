@@ -22,7 +22,7 @@ export function ConsentCheckbox({ sponsor, checked, onChange, error }: ConsentCh
           type="checkbox"
           checked={checked}
           onChange={(e) => onChange(e.target.checked)}
-          className="mt-0.5 h-4 w-4 shrink-0 accent-primary"
+          className="mt-0.5 h-5 w-5 shrink-0 accent-primary sm:h-4 sm:w-4"
           aria-invalid={Boolean(error)}
         />
         <span>

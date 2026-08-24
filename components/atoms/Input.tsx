@@ -23,7 +23,7 @@ export function Input({ label, error, className = "", id, ...props }: InputProps
       <input
         id={inputId}
         className={cn(
-          "w-full rounded-input border bg-surface px-3 py-2 text-sm text-text",
+          "w-full rounded-input border bg-surface px-3 py-2.5 text-base text-text sm:py-2 sm:text-sm",
           "placeholder:text-text-faint",
           "focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-0 focus:border-primary",
           "disabled:opacity-40 disabled:cursor-not-allowed",

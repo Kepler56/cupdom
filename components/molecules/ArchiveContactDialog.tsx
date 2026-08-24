@@ -31,7 +31,7 @@ export function ArchiveContactDialog({ contactId, contactName, onClose, onArchiv
       aria-label="Archiver le contact"
       className="fixed inset-0 z-50 flex items-center justify-center bg-text/30 p-4"
     >
-      <div className="w-full max-w-sm rounded-card border border-border bg-surface p-6 shadow-lg">
+      <div className="max-h-[90dvh] w-full max-w-sm overflow-y-auto rounded-card border border-border bg-surface p-5 shadow-lg sm:p-6">
         <h2 className="mb-2 text-base font-semibold text-text">Archiver {contactName} ?</h2>
         <p className="mb-4 text-sm text-text-muted">
           Il sera masqué et définitivement supprimé dans 30 jours. Vous pourrez le restaurer d&apos;ici là.

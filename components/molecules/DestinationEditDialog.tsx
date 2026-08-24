@@ -45,7 +45,7 @@ export function DestinationEditDialog({ campaign, onDone, onClose }: Destination
       aria-label="Modifier la destination"
       className="fixed inset-0 z-50 flex items-center justify-center bg-text/30 p-4"
     >
-      <div className="w-full max-w-md rounded-card border border-border bg-surface p-6 shadow-lg">
+      <div className="max-h-[90dvh] w-full max-w-md overflow-y-auto rounded-card border border-border bg-surface p-5 shadow-lg sm:p-6">
         <h2 className="mb-1 text-base font-semibold text-text">Modifier la destination</h2>
         <p className="mb-4 text-xs text-text-muted">Le QR et le lien /s/ restent identiques.</p>
 

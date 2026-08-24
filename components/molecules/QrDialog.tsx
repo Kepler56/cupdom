@@ -48,7 +48,7 @@ export function QrDialog({ campaign, onClose }: QrDialogProps) {
       aria-label={`QR — ${campaign.name ?? campaign.slug}`}
       className="fixed inset-0 z-50 flex items-center justify-center bg-text/30 p-4"
     >
-      <div className="w-full max-w-sm rounded-card border border-border bg-surface p-6 shadow-lg">
+      <div className="max-h-[90dvh] w-full max-w-sm overflow-y-auto rounded-card border border-border bg-surface p-5 shadow-lg sm:p-6">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-base font-semibold text-text">QR de la campagne</h2>
           <button type="button" onClick={onClose} aria-label="Fermer" className="text-text-muted hover:text-text">

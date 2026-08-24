@@ -120,7 +120,7 @@ export function CampaignCreateForm({ onCreated, onClose }: CampaignCreateFormPro
       aria-label="Nouvelle campagne"
       className="fixed inset-0 z-50 flex items-center justify-center bg-text/30 p-4"
     >
-      <div className="w-full max-w-md rounded-card border border-border bg-surface p-6 shadow-lg">
+      <div className="max-h-[90dvh] w-full max-w-md overflow-y-auto rounded-card border border-border bg-surface p-5 shadow-lg sm:p-6">
         <h2 className="mb-4 text-base font-semibold text-text">Nouvelle campagne</h2>
 
         <div className="flex flex-col gap-4">

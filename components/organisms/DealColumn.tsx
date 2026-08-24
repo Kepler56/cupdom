@@ -67,7 +67,7 @@ export function DealColumn({ stage, deals, profiles, onChanged }: DealColumnProp
   const total = deals.reduce((sum, d) => sum + (d.valueEur ?? 0), 0);
 
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex w-[82vw] shrink-0 snap-start flex-col gap-2 sm:w-[300px] xl:w-auto xl:shrink">
       <div className="flex items-center justify-between px-1">
         <span className="text-xs font-semibold uppercase tracking-wide text-text-muted">{stage}</span>
         <span className="text-xs text-text-faint">{deals.length}</span>

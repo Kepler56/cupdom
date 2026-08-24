@@ -38,10 +38,10 @@ function ContactRow({
   // The Nom stays a real <Link> for keyboard access; inner buttons stop propagation.
   return (
     <tr
-      className="cursor-pointer border-b border-border last:border-0 hover:bg-canvas"
+      className="group cursor-pointer border-b border-border last:border-0 hover:bg-canvas"
       onClick={() => router.push(href)}
     >
-      <td className="px-3 py-2.5">
+      <td className="sticky left-0 z-10 bg-surface px-3 py-2.5 group-hover:bg-canvas">
         <Link href={href} className="font-medium text-text hover:underline" onClick={(e) => e.stopPropagation()}>
           {contactDisplayName(contact)}
         </Link>
@@ -101,11 +101,15 @@ export function ContactsTable({ rows, profiles, onEdit, onDelete }: ContactsTabl
   }
 
   return (
-    <div className="overflow-hidden rounded-card border border-border bg-surface">
-      <table className="w-full text-left text-sm">
+    // `overflow-x-auto`, not `overflow-hidden`: seven columns do not fit a phone, and
+    // hidden CLIPS them — the owner, the date and the row actions simply vanished with
+    // nothing on screen saying so. The name column stays pinned while the rest scrolls,
+    // so a reader always knows whose row they are looking at.
+    <div className="overflow-x-auto rounded-card border border-border bg-surface">
+      <table className="w-full min-w-[760px] text-left text-sm">
         <thead className="border-b border-border text-xs uppercase tracking-wide text-text-muted">
           <tr>
-            <th className="px-3 py-2.5 font-medium">Nom</th>
+            <th className="sticky left-0 z-10 bg-surface px-3 py-2.5 font-medium">Nom</th>
             <th className="px-3 py-2.5 font-medium">Entreprise</th>
             <th className="px-3 py-2.5 font-medium">Secteur</th>
             <th className="px-3 py-2.5 font-medium">Statut</th>

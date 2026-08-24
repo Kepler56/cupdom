@@ -92,7 +92,7 @@ export function LeadForm({ slug }: { slug: string }) {
       </span>
       <h1 className="mb-1 text-xl font-semibold text-text">Pour accéder à l&apos;offre de {sponsor}</h1>
       <p className="mb-6 text-sm text-text-muted">
-        Renseignez vos coordonnées pour recevoir votre offre. C&apos;est rapide et sans engagement.
+        Renseignez vos coordonnées pour accéder à l&apos;offre. C&apos;est rapide et sans engagement.
       </p>
 
       <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-4">

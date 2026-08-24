@@ -14,7 +14,7 @@ export const metadata: Metadata = {
 export default async function LeadCapturePage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   return (
-    <main className="flex min-h-screen items-center justify-center bg-canvas p-4">
+    <main className="flex min-h-dvh items-center justify-center bg-canvas p-4">
       <LeadForm slug={slug} />
     </main>
   );

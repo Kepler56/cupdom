@@ -26,7 +26,7 @@ export function ReminderForm({ submitting, onSubmit, onClose }: ReminderFormProp
           e.preventDefault();
           onSubmit({ remindOn, note: note || null });
         }}
-        className="w-full max-w-sm rounded-card border border-border bg-surface p-6 shadow-lg"
+        className="max-h-[90dvh] w-full max-w-sm overflow-y-auto rounded-card border border-border bg-surface p-5 shadow-lg sm:p-6"
       >
         <h2 className="mb-4 text-base font-semibold text-text">Nouveau rappel</h2>
         <div className="space-y-4">

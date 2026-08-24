@@ -29,7 +29,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   useEffect(() => setDrawerOpen(false), [pathname]);
 
   return (
-    <div className="flex min-h-screen bg-canvas">
+    <div className="flex min-h-dvh bg-canvas">
       {/* Desktop: static sidebar. */}
       <div className="hidden lg:flex">
         <Sidebar />

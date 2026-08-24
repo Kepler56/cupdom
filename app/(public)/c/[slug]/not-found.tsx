@@ -4,7 +4,7 @@ import { EndedCampaignCard } from '@/components/public/EndedCampaignCard';
 // ended page; this mirrors it for the /c/[slug] route). No form, no events.
 export default function LeadCaptureNotFound() {
   return (
-    <main className="flex min-h-screen items-center justify-center bg-canvas p-6">
+    <main className="flex min-h-dvh items-center justify-center bg-canvas p-4 sm:p-6">
       <EndedCampaignCard />
     </main>
   );

@@ -52,10 +52,10 @@ export function CampaignsList({ rows, onChanged }: CampaignsListProps) {
         </p>
       ) : (
         <div className="overflow-x-auto rounded-card border border-border bg-surface">
-          <table className="w-full text-sm">
+          <table className="w-full min-w-[820px] text-sm">
             <thead>
               <tr className="border-b border-border text-left text-xs uppercase tracking-wide text-text-faint">
-                <th className="px-3 py-2 font-medium">Campagne</th>
+                <th className="sticky left-0 z-10 bg-surface px-3 py-2 font-medium">Campagne</th>
                 <th className="px-3 py-2 font-medium">Sponsor</th>
                 <th className="px-3 py-2 font-medium">Deal</th>
                 <th className="px-3 py-2 font-medium">État</th>

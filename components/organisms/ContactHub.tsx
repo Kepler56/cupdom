@@ -81,14 +81,14 @@ export function ContactHub({ contactId }: { contactId: string }) {
       />
 
       <div>
-        <div className="mb-4 flex gap-1 border-b border-border">
+        <div className="-mx-4 mb-4 flex gap-1 overflow-x-auto border-b border-border px-4 sm:mx-0 sm:px-0">
           {TABS.map((t) => (
             <button
               key={t}
               type="button"
               onClick={() => setTab(t)}
               className={cn(
-                'px-3 py-2 text-sm',
+                'shrink-0 whitespace-nowrap px-3 py-2 text-sm',
                 tab === t
                   ? 'border-b-2 border-primary font-medium text-text'
                   : 'text-text-muted hover:text-text',

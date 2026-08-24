@@ -90,10 +90,10 @@ export function CampaignLeadsTable({ slug, canEdit }: CampaignLeadsTableProps) {
         </p>
       ) : (
         <div className="overflow-x-auto rounded-card border border-border bg-surface">
-          <table className="w-full text-sm">
+          <table className="w-full min-w-[640px] text-sm">
             <thead>
               <tr className="border-b border-border text-left text-xs uppercase tracking-wide text-text-faint">
-                <th className="px-3 py-2 font-medium">Nom</th>
+                <th className="sticky left-0 z-10 bg-surface px-3 py-2 font-medium">Nom</th>
                 <th className="px-3 py-2 font-medium">Email</th>
                 <th className="px-3 py-2 font-medium">Téléphone</th>
                 <th className="px-3 py-2 font-medium">Capturé le</th>
@@ -143,7 +143,7 @@ export function CampaignLeadsTable({ slug, canEdit }: CampaignLeadsTableProps) {
           aria-label="Effacer les données du lead"
           className="fixed inset-0 z-50 flex items-center justify-center bg-text/30 p-4"
         >
-          <div className="w-full max-w-md rounded-card border border-border bg-surface p-6 shadow-lg">
+          <div className="max-h-[90dvh] w-full max-w-md overflow-y-auto rounded-card border border-border bg-surface p-5 shadow-lg sm:p-6">
             <h3 className="mb-3 text-base font-semibold text-text">Effacer les données personnelles ?</h3>
             <p className="mb-6 text-sm text-text-muted">
               Le prénom, le nom, l&apos;email et le téléphone de ce lead seront supprimés définitivement. Les

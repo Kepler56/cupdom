@@ -75,7 +75,7 @@ export function PortalAccessDialog({ contactId, contactName, onClose, onGranted 
       aria-label="Accès au portail"
       className="fixed inset-0 z-50 flex items-center justify-center bg-text/30 p-4"
     >
-      <div className="w-full max-w-sm rounded-card border border-border bg-surface p-6 shadow-lg">
+      <div className="max-h-[90dvh] w-full max-w-sm overflow-y-auto rounded-card border border-border bg-surface p-5 shadow-lg sm:p-6">
         <h2 className="mb-2 text-base font-semibold text-text">Accès au portail — {contactName}</h2>
 
         {!result && (

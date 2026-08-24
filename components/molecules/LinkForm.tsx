@@ -36,7 +36,7 @@ export function LinkForm({ submitting, onSubmit, onClose }: LinkFormProps) {
           e.preventDefault();
           submit();
         }}
-        className="w-full max-w-sm rounded-card border border-border bg-surface p-6 shadow-lg"
+        className="max-h-[90dvh] w-full max-w-sm overflow-y-auto rounded-card border border-border bg-surface p-5 shadow-lg sm:p-6"
       >
         <h2 className="mb-4 text-base font-semibold text-text">Nouveau lien</h2>
         <div className="space-y-4">

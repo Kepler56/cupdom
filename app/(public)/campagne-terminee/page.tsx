@@ -10,7 +10,7 @@ export const metadata: Metadata = {
 
 export default function CampagneTermineePage() {
   return (
-    <main className="flex min-h-screen items-center justify-center bg-canvas p-6">
+    <main className="flex min-h-dvh items-center justify-center bg-canvas p-4 sm:p-6">
       <EndedCampaignCard />
     </main>
   );
