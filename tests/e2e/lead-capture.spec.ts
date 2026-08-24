@@ -55,7 +55,7 @@ test.describe('3A lead capture', () => {
 
   test('consent unticked → blocked, no redirect (AC-5 hard gate)', async ({ page }) => {
     await page.goto(`/c/${ACTIVE}`);
-    await fillForm(page, `gate_${Date.now()}@x.fr`);
+    await fillForm(page, `gate_${Date.now()}@cupdom.fr`);
     await page.getByRole('button', { name: "Recevoir l'offre" }).click();
     await expect(page.getByText("Vous devez accepter pour recevoir l'offre")).toBeVisible();
     await expect(page).toHaveURL(new RegExp(`/c/${ACTIVE}$`));
@@ -63,11 +63,53 @@ test.describe('3A lead capture', () => {
 
   test('valid + consent → Merci then redirect to the destination host (AC-6/7)', async ({ page }) => {
     await page.goto(`/c/${ACTIVE}`);
-    await fillForm(page, `ok_${Date.now()}@x.fr`);
+    await fillForm(page, `ok_${Date.now()}@cupdom.fr`);
     await page.getByRole('checkbox').check();
     await page.getByRole('button', { name: "Recevoir l'offre" }).click();
     await page.waitForURL(new RegExp(DEST_HOST!.replace('.', '\\.')));
     expect(page.url()).toContain(DEST_HOST!);
+  });
+
+  test('un e-mail jetable est refusé avec son propre message, sans redirection', async ({ page }) => {
+    await page.goto(`/c/${ACTIVE}`);
+    await fillForm(page, `spam_${Date.now()}@yopmail.com`);
+    await page.getByRole('checkbox').check();
+    await page.getByRole('button', { name: "Recevoir l'offre" }).click();
+    await expect(page.getByText('Merci d’utiliser une adresse e-mail permanente')).toBeVisible();
+    await expect(page).toHaveURL(new RegExp(`/c/${ACTIVE}$`));
+  });
+
+  test('un domaine d’une seule lettre (t@g.com) est refusé', async ({ page }) => {
+    await page.goto(`/c/${ACTIVE}`);
+    await fillForm(page, 't@g.com');
+    await page.getByRole('checkbox').check();
+    await page.getByRole('button', { name: "Recevoir l'offre" }).click();
+    await expect(page.getByText('Adresse e-mail invalide')).toBeVisible();
+    await expect(page).toHaveURL(new RegExp(`/c/${ACTIVE}$`));
+  });
+
+  test('un numéro impossible pour le pays choisi est refusé', async ({ page }) => {
+    await page.goto(`/c/${ACTIVE}`);
+    await fillForm(page, `bad_${Date.now()}@cupdom.fr`);
+    await page.getByLabel('Téléphone').fill('00 00 00 00 00');
+    await page.getByRole('checkbox').check();
+    await page.getByRole('button', { name: "Recevoir l'offre" }).click();
+    await expect(page.getByText('Numéro de téléphone invalide')).toBeVisible();
+    await expect(page).toHaveURL(new RegExp(`/c/${ACTIVE}$`));
+  });
+
+  test('changer l’indicatif pays applique les règles de ce pays', async ({ page }) => {
+    await page.goto(`/c/${ACTIVE}`);
+    await fillForm(page, `be_${Date.now()}@cupdom.fr`);
+    // 06 12 34 56 78 is a valid FR mobile but not a valid BE number.
+    await page.getByLabel('Indicatif pays').selectOption('BE');
+    await page.getByRole('checkbox').check();
+    await page.getByRole('button', { name: "Recevoir l'offre" }).click();
+    await expect(page.getByText('Numéro de téléphone invalide')).toBeVisible();
+
+    await page.getByLabel('Téléphone').fill('470 12 34 56');
+    await page.getByRole('button', { name: "Recevoir l'offre" }).click();
+    await page.waitForURL(new RegExp(DEST_HOST!.replace('.', '\.')));
   });
 
   test('Terminée campaign → the form never renders (AC-1/§10)', async ({ page }) => {

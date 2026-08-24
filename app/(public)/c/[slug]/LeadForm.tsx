@@ -8,7 +8,8 @@ import { ConsentCheckbox } from '@/components/public/ConsentCheckbox';
 import { FieldError } from '@/components/public/FieldError';
 import { EndedCampaignCard } from '@/components/public/EndedCampaignCard';
 import { CONSENT_VERSION } from '@/lib/public/consent';
-import { validateLead, type LeadErrors } from '@/lib/public/validation';
+import { PhoneField, type PhoneValue } from '@/components/public/PhoneField';
+import { toE164, validateLead, type LeadErrors } from '@/lib/public/validation';
 import { postFormView, postSubmit } from '@/lib/public/leadClient';
 
 // Visuals are intentionally minimal — Spec 4 owns the form polish. Logic/validation/a11y are the contract.
@@ -20,7 +21,7 @@ export function LeadForm({ slug }: { slug: string }) {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
-  const [phone, setPhone] = useState('');
+  const [phone, setPhone] = useState<PhoneValue>({ country: 'FR', national: '' });
   const [consent, setConsent] = useState(false); // un-ticked by default (AC-2/5)
   const [website, setWebsite] = useState(''); // honeypot — real users leave it empty
   const [errors, setErrors] = useState<LeadErrors>({});
@@ -38,7 +39,11 @@ export function LeadForm({ slug }: { slug: string }) {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const found = validateLead({ firstName, lastName, email, phone, consent });
+    // The country select owns the dial code, so the contract value is always E.164. When the
+    // digits form no valid number toE164 returns null; pass the raw text through so the empty
+    // case still reads as "required" rather than "invalid".
+    const e164 = toE164(phone.national, phone.country) ?? phone.national.trim();
+    const found = validateLead({ firstName, lastName, email, phone: e164, consent });
     setErrors(found);
     if (Object.keys(found).length > 0) return; // hard gate — nothing sent when invalid (AC-4/5)
 
@@ -48,7 +53,7 @@ export function LeadForm({ slug }: { slug: string }) {
       firstName,
       lastName,
       email,
-      phone,
+      phone: e164,
       consent,
       website,
       consentVersion: CONSENT_VERSION,
@@ -115,17 +120,7 @@ export function LeadForm({ slug }: { slug: string }) {
           />
           <FieldError message={errors.email} />
         </div>
-        <div>
-          <Input
-            label="Téléphone"
-            type="tel"
-            inputMode="tel"
-            autoComplete="tel"
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-          />
-          <FieldError message={errors.phone} />
-        </div>
+        <PhoneField {...phone} onChange={setPhone} error={errors.phone} />
 
         <ConsentCheckbox sponsor={sponsor} checked={consent} onChange={setConsent} error={errors.consent} />
 

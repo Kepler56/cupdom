@@ -23,7 +23,7 @@ afterEach(() => vi.clearAllMocks());
 async function fillValid() {
   fireEvent.change(await screen.findByLabelText('Prénom'), { target: { value: 'Marie' } });
   fireEvent.change(screen.getByLabelText('Nom'), { target: { value: 'Curie' } });
-  fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'marie@x.fr' } });
+  fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'marie@gmail.com' } });
   fireEvent.change(screen.getByLabelText('Téléphone'), { target: { value: '06 12 34 56 78' } });
 }
 
@@ -75,9 +75,53 @@ describe('LeadForm', () => {
 
     await waitFor(() => expect(postSubmit).toHaveBeenCalledTimes(1));
     const payload = (postSubmit as Mock).mock.calls[0][0];
-    expect(payload).toMatchObject({ slug: 'abcd23', firstName: 'Marie', email: 'marie@x.fr', consent: true, website: '' });
+    expect(payload).toMatchObject({ slug: 'abcd23', firstName: 'Marie', email: 'marie@gmail.com', consent: true, website: '' });
     expect(payload.consentVersion).toBeTruthy();
     await waitFor(() => expect(assign).toHaveBeenCalledWith('https://nike.fr/ete'));
+  });
+
+  it('submits the phone as E.164 assembled from the country select + typed digits', async () => {
+    render(<LeadForm slug="abcd23" />);
+    await fillValid();
+    fireEvent.click(screen.getByRole('checkbox'));
+    fireEvent.click(screen.getByRole('button', { name: "Recevoir l'offre" }));
+
+    await waitFor(() => expect(postSubmit).toHaveBeenCalled());
+    expect((postSubmit as Mock).mock.calls[0][0].phone).toBe('+33612345678');
+  });
+
+  it('a non-French country changes the dial code applied to the same digits', async () => {
+    render(<LeadForm slug="abcd23" />);
+    await fillValid();
+    fireEvent.change(screen.getByLabelText('Indicatif pays'), { target: { value: 'BE' } });
+    fireEvent.change(screen.getByLabelText('Téléphone'), { target: { value: '470 12 34 56' } });
+    fireEvent.click(screen.getByRole('checkbox'));
+    fireEvent.click(screen.getByRole('button', { name: "Recevoir l'offre" }));
+
+    await waitFor(() => expect(postSubmit).toHaveBeenCalled());
+    expect((postSubmit as Mock).mock.calls[0][0].phone).toBe('+32470123456');
+  });
+
+  it('an impossible number is blocked inline; postSubmit is NOT called', async () => {
+    render(<LeadForm slug="abcd23" />);
+    await fillValid();
+    fireEvent.change(screen.getByLabelText('Téléphone'), { target: { value: '00 00 00 00 00' } });
+    fireEvent.click(screen.getByRole('checkbox'));
+    fireEvent.click(screen.getByRole('button', { name: "Recevoir l'offre" }));
+
+    expect(await screen.findByText('Numéro de téléphone invalide')).toBeInTheDocument();
+    expect(postSubmit).not.toHaveBeenCalled();
+  });
+
+  it('a disposable email is blocked inline with its own message; postSubmit is NOT called', async () => {
+    render(<LeadForm slug="abcd23" />);
+    await fillValid();
+    fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'marie@yopmail.com' } });
+    fireEvent.click(screen.getByRole('checkbox'));
+    fireEvent.click(screen.getByRole('button', { name: "Recevoir l'offre" }));
+
+    expect(await screen.findByText('Merci d’utiliser une adresse e-mail permanente')).toBeInTheDocument();
+    expect(postSubmit).not.toHaveBeenCalled();
   });
 
   it('honeypot "website" is present, hidden, and included in the payload (AC-8)', async () => {
