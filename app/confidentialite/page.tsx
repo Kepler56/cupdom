@@ -37,6 +37,27 @@ export default function ConfidentialitePage() {
           </p>
         </Section>
 
+        <Section title="Données collectées">
+          <p>
+            <strong>Ce que vous saisissez.</strong> Sur le formulaire d’une campagne : votre prénom, votre nom,
+            votre adresse e-mail et votre numéro de téléphone. Nous conservons aussi la campagne concernée et
+            votre consentement, horodaté et rattaché à la version du texte que vous avez lu.
+          </p>
+          <p>
+            <strong>Ce que le scan enregistre.</strong> Lorsqu’un QR Cupdom est scanné, nous enregistrons la
+            campagne et son état à cet instant, le pays, la région et la ville, le type d’appareil, le système
+            d’exploitation, le navigateur, la langue, un indicateur signalant les robots, et un identifiant de
+            visite pseudonyme.
+          </p>
+          <p>
+            <strong>Ce que nous ne conservons pas.</strong> Ni votre adresse IP ni votre agent utilisateur ne
+            sont stockés. Ils servent uniquement à calculer l’identifiant de visite — une empreinte
+            <strong> SHA-256</strong> mêlant un secret et la date du jour, renouvelée chaque jour, dont on ne peut
+            pas remonter à vous. La localisation reste au niveau de la ville : nous n’avons ni adresse ni position
+            précise.
+          </p>
+        </Section>
+
         <Section title="Finalités">
           <p>
             Vos données servent à vous transmettre l&apos;offre du sponsor, à prouver la valeur du placement
