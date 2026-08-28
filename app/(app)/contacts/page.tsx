@@ -112,9 +112,14 @@ export default function ContactsPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between gap-4">
-        <div className="flex items-center gap-4">
-          <div className="flex border-b border-border">
+      {/* Stacks below sm. The single row could not fit a phone: the tabs, a
+          fixed w-56 search and the two buttons need ~577px side by side, so at
+          390px the whole PAGE scrolled sideways by ~200px — not the table, which
+          scrolls correctly inside its own container. Same column-then-row shape
+          the Card headers already use. CRM-C12. */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+        <div className="flex min-w-0 items-center gap-3 sm:gap-4">
+          <div className="flex shrink-0 border-b border-border">
             <button type="button" className={tabClass(view === 'actifs')} onClick={() => setView('actifs')}>
               Actifs
             </button>
@@ -122,7 +127,7 @@ export default function ContactsPage() {
               Archivés
             </button>
           </div>
-          <div className="w-56">
+          <div className="min-w-0 flex-1 sm:w-56 sm:flex-none">
             <Input
               aria-label="Rechercher un contact"
               placeholder="Rechercher…"
@@ -131,7 +136,7 @@ export default function ContactsPage() {
             />
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex shrink-0 items-center gap-2">
           <ExportButton datasetId="contacts" rows={exportRows} />
           {canCreate && (
             <Button
