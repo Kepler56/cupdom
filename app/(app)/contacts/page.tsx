@@ -79,6 +79,11 @@ export default function ContactsPage() {
     try {
       if (editing) await updateContact(editing.id, input);
       else if (myId) await createContact(input, myId);
+      // No owner id yet: the member profile is still loading while the scope already
+      // defaults to "me", so "+ Nouveau contact" is live before `myId` resolves. Falling
+      // through here closed the form and dropped the contact without a word — throw
+      // instead, so the catch below keeps the form open with the typed values intact.
+      else throw new Error('Profil du membre non chargé : propriétaire inconnu.');
       setFormOpen(false);
       setEditing(null);
       await reload();
