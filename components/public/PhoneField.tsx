@@ -54,8 +54,12 @@ export function PhoneField({ country, national, onChange, error }: PhoneFieldPro
   return (
     <div>
       <div className="flex flex-col gap-1">
+        {/* « (facultatif) » is INSIDE the label, so it is part of the accessible
+            name rather than decoration beside it. This is the only optional
+            field on the form; a screen-reader user who cannot hear that has to
+            guess, and guessing wrong on a lead form costs the lead. */}
         <label htmlFor={inputId} className="text-xs font-medium text-text-muted">
-          Téléphone
+          Téléphone <span className="font-normal text-text-faint">(facultatif)</span>
         </label>
         {/* One bordered box around both controls so they read as a single field. */}
         <div

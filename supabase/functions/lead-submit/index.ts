@@ -111,7 +111,12 @@ Deno.serve(async (req: Request): Promise<Response> => {
           first_name: input.firstName.trim(),
           last_name: input.lastName.trim(),
           email,
-          phone: input.phone.trim(),
+          // `|| null`, never ''. Phone is optional (2026-09) and an empty string
+          // is NOT an absent value here: migration 0008's anonymisation job
+          // selects rows where `phone is not null`, and the portal derives a
+          // lead's "anonymised" state from PII presence. Storing '' would make
+          // every phone-less lead look like it still holds a number, forever.
+          phone: input.phone.trim() || null,
           last_activity_at: new Date().toISOString(),
         },
         { onConflict: 'campaign_slug,email' },

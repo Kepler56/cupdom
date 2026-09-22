@@ -24,7 +24,7 @@ async function fillValid() {
   fireEvent.change(await screen.findByLabelText('Prénom'), { target: { value: 'Marie' } });
   fireEvent.change(screen.getByLabelText('Nom'), { target: { value: 'Curie' } });
   fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'marie@gmail.com' } });
-  fireEvent.change(screen.getByLabelText('Téléphone'), { target: { value: '06 12 34 56 78' } });
+  fireEvent.change(screen.getByLabelText('Téléphone (facultatif)'), { target: { value: '06 12 34 56 78' } });
 }
 
 describe('LeadForm', () => {
@@ -33,7 +33,7 @@ describe('LeadForm', () => {
     expect(await screen.findByLabelText('Prénom')).toBeInTheDocument();
     expect(screen.getByLabelText('Nom')).toBeInTheDocument();
     expect(screen.getByLabelText('Email')).toBeInTheDocument();
-    expect(screen.getByLabelText('Téléphone')).toBeInTheDocument();
+    expect(screen.getByLabelText('Téléphone (facultatif)')).toBeInTheDocument();
     const consent = screen.getByRole('checkbox');
     expect(consent).not.toBeChecked(); // un-ticked
     expect(screen.getByRole('link', { name: 'Politique de confidentialité' })).toBeInTheDocument();
@@ -90,11 +90,42 @@ describe('LeadForm', () => {
     expect((postSubmit as Mock).mock.calls[0][0].phone).toBe('+33612345678');
   });
 
+  // The point of making the field optional: this path must reach postSubmit.
+  // Asserted at the FORM level rather than only on validateLead, because the
+  // form does not send what the user typed — it sends
+  // `toE164(national, country) ?? national.trim()`, and toE164('') is null. The
+  // unit that decides whether an empty box becomes '' or the string 'null' is
+  // this one.
+  it('submits with no phone at all, sending an empty string the Edge stores as null', async () => {
+    render(<LeadForm slug="abcd23" />);
+    fireEvent.change(await screen.findByLabelText('Prénom'), { target: { value: 'Marie' } });
+    fireEvent.change(screen.getByLabelText('Nom'), { target: { value: 'Curie' } });
+    fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'marie@gmail.com' } });
+    // Téléphone deliberately untouched.
+    fireEvent.click(screen.getByRole('checkbox'));
+    fireEvent.click(screen.getByRole('button', { name: "Recevoir l'offre" }));
+
+    await waitFor(() => expect(postSubmit).toHaveBeenCalledTimes(1));
+    expect((postSubmit as Mock).mock.calls[0][0].phone).toBe('');
+    await waitFor(() => expect(assign).toHaveBeenCalledWith('https://nike.fr/ete'));
+  });
+
+  it('a half-typed number is still refused, so an optional field cannot swallow a typo', async () => {
+    render(<LeadForm slug="abcd23" />);
+    await fillValid();
+    fireEvent.change(screen.getByLabelText('Téléphone (facultatif)'), { target: { value: '06' } });
+    fireEvent.click(screen.getByRole('checkbox'));
+    fireEvent.click(screen.getByRole('button', { name: "Recevoir l'offre" }));
+
+    expect(await screen.findByText('Numéro de téléphone invalide')).toBeInTheDocument();
+    expect(postSubmit).not.toHaveBeenCalled();
+  });
+
   it('a non-French country changes the dial code applied to the same digits', async () => {
     render(<LeadForm slug="abcd23" />);
     await fillValid();
     fireEvent.change(screen.getByLabelText('Indicatif pays'), { target: { value: 'BE' } });
-    fireEvent.change(screen.getByLabelText('Téléphone'), { target: { value: '470 12 34 56' } });
+    fireEvent.change(screen.getByLabelText('Téléphone (facultatif)'), { target: { value: '470 12 34 56' } });
     fireEvent.click(screen.getByRole('checkbox'));
     fireEvent.click(screen.getByRole('button', { name: "Recevoir l'offre" }));
 
@@ -105,7 +136,7 @@ describe('LeadForm', () => {
   it('an impossible number is blocked inline; postSubmit is NOT called', async () => {
     render(<LeadForm slug="abcd23" />);
     await fillValid();
-    fireEvent.change(screen.getByLabelText('Téléphone'), { target: { value: '00 00 00 00 00' } });
+    fireEvent.change(screen.getByLabelText('Téléphone (facultatif)'), { target: { value: '00 00 00 00 00' } });
     fireEvent.click(screen.getByRole('checkbox'));
     fireEvent.click(screen.getByRole('button', { name: "Recevoir l'offre" }));
 

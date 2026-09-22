@@ -18,6 +18,12 @@ const fixtures: LeadInput[] = [
   { firstName: 'A', lastName: 'B', email: 'ok@gmail.com', phone: '0612345678', consent: true },
   { firstName: 'A', lastName: 'B', email: 'ok@gmail.com', phone: '+33000000000', consent: true },
   { firstName: 'A', lastName: 'B', email: 'ok@gmail.com', phone: '526722', consent: true },
+  // Phone made optional (2026-09). Both sides must agree that an omitted number
+  // passes and that a typed-but-broken one does not — a client that accepts what
+  // the Edge rejects turns a valid lead into an opaque 400 at submit time.
+  { firstName: 'A', lastName: 'B', email: 'ok@gmail.com', phone: '', consent: true },
+  { firstName: 'A', lastName: 'B', email: 'ok@gmail.com', phone: '   ', consent: true },
+  { firstName: 'A', lastName: 'B', email: 'ok@gmail.com', phone: '+33612', consent: true },
 ];
 
 describe('lead-submit validate parity', () => {

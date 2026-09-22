@@ -39,9 +39,10 @@ export default function ConfidentialitePage() {
 
         <Section title="Données collectées">
           <p>
-            <strong>Ce que vous saisissez.</strong> Sur le formulaire d’une campagne : votre prénom, votre nom,
-            votre adresse e-mail et votre numéro de téléphone. Nous conservons aussi la campagne concernée et
-            votre consentement, horodaté et rattaché à la version du texte que vous avez lu.
+            <strong>Ce que vous saisissez.</strong> Sur le formulaire d’une campagne : votre prénom, votre nom
+            et votre adresse e-mail, ainsi que votre numéro de téléphone si vous choisissez de le renseigner —
+            il est facultatif. Nous conservons aussi la campagne concernée et votre consentement, horodaté et
+            rattaché à la version du texte que vous avez lu.
           </p>
           <p>
             <strong>Ce que le scan enregistre.</strong> Lorsqu’un QR Cupdom est scanné, nous enregistrons la

@@ -15,14 +15,14 @@ import {
 const valid: LeadInput = { firstName: 'Marie', lastName: 'Curie', email: 'a.b@cupdom.fr', phone: '+33612345678', consent: true };
 
 describe('validateLead', () => {
-  it('all empty → required errors on all five fields', () => {
+  it('all empty → required errors on the four REQUIRED fields, phone excepted', () => {
     const e = validateLead({ firstName: '', lastName: '', email: '', phone: '', consent: false });
     expect(e.firstName).toBe(REQUIRED_MSG);
     expect(e.lastName).toBe(REQUIRED_MSG);
     expect(e.email).toBe(REQUIRED_MSG);
-    expect(e.phone).toBe(REQUIRED_MSG);
+    expect(e.phone).toBeUndefined();
     expect(e.consent).toBe(CONSENT_MSG);
-    expect(Object.keys(e)).toHaveLength(5);
+    expect(Object.keys(e)).toHaveLength(4);
   });
 
   it('consent false → consent error; true → none', () => {
@@ -99,6 +99,21 @@ describe('email disposable-domain blocklist', () => {
 });
 
 describe('phone', () => {
+  // Optional since 2026-09: an omitted number is a valid lead. The rule is
+  // "empty OR well-formed", never "empty or anything" — a typed number that
+  // cannot be dialled is still a mistake worth showing, and it is the one
+  // field a user can leave half-finished by tabbing out of the country select.
+  it('accepts an omitted number, whitespace included', () => {
+    for (const phone of ['', ' ', '   ', '\t']) {
+      expect(validateLead({ ...valid, phone }).phone, JSON.stringify(phone)).toBeUndefined();
+    }
+  });
+
+  it('still rejects a number that was typed but is malformed', () => {
+    expect(validateLead({ ...valid, phone: '06' }).phone).toBe(PHONE_MSG);
+    expect(validateLead({ ...valid, phone: '+33612' }).phone).toBe(PHONE_MSG);
+  });
+
   it('rejects a number with no country code', () => {
     for (const phone of ['0612345678', '06 12 34 56 78', '01.23.45.67.89']) {
       expect(validateLead({ ...valid, phone }).phone, phone).toBe(PHONE_MSG);

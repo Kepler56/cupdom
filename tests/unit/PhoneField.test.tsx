@@ -51,7 +51,7 @@ describe('PHONE_COUNTRIES', () => {
 describe('PhoneField', () => {
   it('renders a labelled number input and an accessible country select', () => {
     setup();
-    expect(screen.getByLabelText('Téléphone')).toBeInTheDocument();
+    expect(screen.getByLabelText('Téléphone (facultatif)')).toBeInTheDocument();
     expect(screen.getByLabelText('Indicatif pays')).toBeInTheDocument();
   });
 
@@ -69,19 +69,19 @@ describe('PhoneField', () => {
 
   it('reports typed digits back, formatted for the selected country', async () => {
     const { onChange } = setup();
-    await userEvent.type(screen.getByLabelText('Téléphone'), '0612345678');
+    await userEvent.type(screen.getByLabelText('Téléphone (facultatif)'), '0612345678');
     expect(onChange).toHaveBeenLastCalledWith({ country: 'FR', national: '06 12 34 56 78' });
   });
 
   it('marks the input invalid and shows the message when given an error', () => {
     render(<PhoneField country="FR" national="" onChange={vi.fn()} error="Numéro de téléphone invalide" />);
-    expect(screen.getByLabelText('Téléphone')).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.getByLabelText('Téléphone (facultatif)')).toHaveAttribute('aria-invalid', 'true');
     expect(screen.getByRole('alert')).toHaveTextContent('Numéro de téléphone invalide');
   });
 
   it('uses tel semantics so mobile keyboards show digits', () => {
     setup();
-    const input = screen.getByLabelText('Téléphone');
+    const input = screen.getByLabelText('Téléphone (facultatif)');
     expect(input).toHaveAttribute('type', 'tel');
     expect(input).toHaveAttribute('inputMode', 'tel');
   });

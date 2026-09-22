@@ -86,9 +86,15 @@ export function validateLead(input: LeadInput): LeadErrors {
   else if (email.length > 254 || !EMAIL_RE.test(email)) errors.email = EMAIL_MSG;
   else if (isDisposableEmail(email)) errors.email = EMAIL_DISPOSABLE_MSG;
 
+  // OPTIONAL since 2026-09, and the only optional field on the form. Empty is a
+  // complete answer, so it produces no error at all; a number that WAS typed is
+  // still held to E.164, because a half-entered one is a mistake the visitor can
+  // fix here and nobody can fix later. `leads.phone` is nullable and the Edge
+  // Function stores null rather than '' — see lead-submit/index.ts, where the
+  // distinction decides whether the GDPR anonymisation job considers the row to
+  // still hold PII.
   const phone = input.phone.trim();
-  if (phone === '') errors.phone = REQUIRED_MSG;
-  else if (!isValidPhone(phone)) errors.phone = PHONE_MSG;
+  if (phone !== '' && !isValidPhone(phone)) errors.phone = PHONE_MSG;
 
   if (input.consent !== true) errors.consent = CONSENT_MSG;
 
