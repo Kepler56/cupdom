@@ -105,6 +105,18 @@ Deno.serve(async (req: Request): Promise<Response> => {
   // successful path. Each write is safe to retry — see _shared/retry.ts. A write that
   // still fails after the retries is logged as a structured, greppable line so a lost
   // lead stops being invisible.
+  // Optional precise location (#5), only when the visitor opted in AND the browser
+  // granted geolocation. Validated to real ranges; anything off is simply dropped
+  // (never stored), so a spoofed or malformed value can't poison the row. Absent is
+  // the normal case. When present it is written with geo_source='gps'; when absent
+  // the columns are left untouched, so a returning visitor keeps a location they
+  // shared before rather than having it wiped by a later no-location submit.
+  const lat = Number(payload.latitude);
+  const lng = Number(payload.longitude);
+  const hasGeo =
+    Number.isFinite(lat) && Number.isFinite(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180;
+  const geoFields = hasGeo ? { latitude: lat, longitude: lng, geo_source: 'gps' } : {};
+
   try {
     const email = normaliseEmail(input.email);
 
@@ -118,6 +130,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
             first_name: input.firstName.trim(),
             last_name: input.lastName.trim(),
             email,
+            ...geoFields,
             // `|| null`, never ''. Phone is optional (2026-09) and an empty string
             // is NOT an absent value here: migration 0008's anonymisation job
             // selects rows where `phone is not null`, and the portal derives a

@@ -14,6 +14,9 @@ export interface SubmitPayload extends LeadInput {
   slug: string;
   website: string; // honeypot (must stay empty for real users)
   consentVersion: string;
+  /** Optional precise location (#5), only when the visitor opted in and granted geolocation. */
+  latitude?: number;
+  longitude?: number;
 }
 
 export type SubmitResult = { redirect: string } | { errors: LeadErrors };

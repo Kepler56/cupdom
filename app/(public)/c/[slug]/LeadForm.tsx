@@ -23,6 +23,11 @@ export function LeadForm({ slug }: { slug: string }) {
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState<PhoneValue>({ country: 'FR', national: '' });
   const [consent, setConsent] = useState(false); // un-ticked by default (AC-2/5)
+  // Optional precise location (#5), off by default. A SEPARATE explicit consent from
+  // the data-sharing one: precise GPS is sensitive, so it is opt-in and captured only
+  // if the browser then grants it. Denied/unavailable → we continue without it.
+  const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [geoStatus, setGeoStatus] = useState<'idle' | 'pending' | 'ok' | 'denied' | 'unavailable'>('idle');
   const [website, setWebsite] = useState(''); // honeypot — real users leave it empty
   const [errors, setErrors] = useState<LeadErrors>({});
   const [submitting, setSubmitting] = useState(false);
@@ -36,6 +41,30 @@ export function LeadForm({ slug }: { slug: string }) {
       setPhase(res.active ? 'active' : 'inactive');
     });
   }, [slug]);
+
+  function onToggleLocation(checked: boolean) {
+    if (!checked) {
+      setCoords(null);
+      setGeoStatus('idle');
+      return;
+    }
+    if (typeof navigator === 'undefined' || !('geolocation' in navigator)) {
+      setGeoStatus('unavailable');
+      return;
+    }
+    setGeoStatus('pending');
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+        setGeoStatus('ok');
+      },
+      () => {
+        setCoords(null);
+        setGeoStatus('denied');
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 },
+    );
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -57,6 +86,8 @@ export function LeadForm({ slug }: { slug: string }) {
       consent,
       website,
       consentVersion: CONSENT_VERSION,
+      // Only sent when the visitor opted in and the browser granted it.
+      ...(coords ? { latitude: coords.lat, longitude: coords.lng } : {}),
     });
     setSubmitting(false);
 
@@ -123,6 +154,32 @@ export function LeadForm({ slug }: { slug: string }) {
         <PhoneField {...phone} onChange={setPhone} error={errors.phone} />
 
         <ConsentCheckbox sponsor={sponsor} checked={consent} onChange={setConsent} error={errors.consent} />
+
+        {/* Optional precise location (#5). Separate, explicit, off by default. */}
+        <div className="rounded-input border border-border p-3">
+          <label className="flex items-start gap-2.5 text-sm text-text">
+            <input
+              type="checkbox"
+              className="mt-0.5"
+              checked={geoStatus === 'ok' || geoStatus === 'pending'}
+              onChange={(e) => onToggleLocation(e.target.checked)}
+            />
+            <span>
+              Partager ma position précise <span className="text-text-muted">(facultatif)</span>
+              <span className="mt-0.5 block text-xs text-text-muted">
+                Aide {sponsor || 'la marque'} à savoir où ses QR sont scannés. Vous pouvez continuer sans.
+              </span>
+            </span>
+          </label>
+          {geoStatus === 'pending' && <p className="mt-2 text-xs text-text-muted">Localisation en cours…</p>}
+          {geoStatus === 'ok' && <p className="mt-2 text-xs text-success-fg">Position ajoutée.</p>}
+          {geoStatus === 'denied' && (
+            <p className="mt-2 text-xs text-text-muted">Localisation refusée — vous pouvez continuer sans.</p>
+          )}
+          {geoStatus === 'unavailable' && (
+            <p className="mt-2 text-xs text-text-muted">Localisation indisponible sur cet appareil.</p>
+          )}
+        </div>
 
         {/* Honeypot: hidden from real users; bots fill it; the server drops spam (AC-8). */}
         <input

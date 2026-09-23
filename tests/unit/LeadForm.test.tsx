@@ -34,7 +34,7 @@ describe('LeadForm', () => {
     expect(screen.getByLabelText('Nom')).toBeInTheDocument();
     expect(screen.getByLabelText('Email')).toBeInTheDocument();
     expect(screen.getByLabelText('Téléphone (facultatif)')).toBeInTheDocument();
-    const consent = screen.getByRole('checkbox');
+    const consent = screen.getByRole('checkbox', { name: /J'accepte/ });
     expect(consent).not.toBeChecked(); // un-ticked
     expect(screen.getByRole('link', { name: 'Politique de confidentialité' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: "Recevoir l'offre" })).toBeInTheDocument();
@@ -70,7 +70,7 @@ describe('LeadForm', () => {
   it('valid + consent → postSubmit once with payload; redirect navigates (AC-6)', async () => {
     render(<LeadForm slug="abcd23" />);
     await fillValid();
-    fireEvent.click(screen.getByRole('checkbox'));
+    fireEvent.click(screen.getByRole('checkbox', { name: /J'accepte/ }));
     fireEvent.click(screen.getByRole('button', { name: "Recevoir l'offre" }));
 
     await waitFor(() => expect(postSubmit).toHaveBeenCalledTimes(1));
@@ -83,7 +83,7 @@ describe('LeadForm', () => {
   it('submits the phone as E.164 assembled from the country select + typed digits', async () => {
     render(<LeadForm slug="abcd23" />);
     await fillValid();
-    fireEvent.click(screen.getByRole('checkbox'));
+    fireEvent.click(screen.getByRole('checkbox', { name: /J'accepte/ }));
     fireEvent.click(screen.getByRole('button', { name: "Recevoir l'offre" }));
 
     await waitFor(() => expect(postSubmit).toHaveBeenCalled());
@@ -102,7 +102,7 @@ describe('LeadForm', () => {
     fireEvent.change(screen.getByLabelText('Nom'), { target: { value: 'Curie' } });
     fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'marie@gmail.com' } });
     // Téléphone deliberately untouched.
-    fireEvent.click(screen.getByRole('checkbox'));
+    fireEvent.click(screen.getByRole('checkbox', { name: /J'accepte/ }));
     fireEvent.click(screen.getByRole('button', { name: "Recevoir l'offre" }));
 
     await waitFor(() => expect(postSubmit).toHaveBeenCalledTimes(1));
@@ -114,7 +114,7 @@ describe('LeadForm', () => {
     render(<LeadForm slug="abcd23" />);
     await fillValid();
     fireEvent.change(screen.getByLabelText('Téléphone (facultatif)'), { target: { value: '06' } });
-    fireEvent.click(screen.getByRole('checkbox'));
+    fireEvent.click(screen.getByRole('checkbox', { name: /J'accepte/ }));
     fireEvent.click(screen.getByRole('button', { name: "Recevoir l'offre" }));
 
     expect(await screen.findByText('Numéro de téléphone invalide')).toBeInTheDocument();
@@ -126,7 +126,7 @@ describe('LeadForm', () => {
     await fillValid();
     fireEvent.change(screen.getByLabelText('Indicatif pays'), { target: { value: 'BE' } });
     fireEvent.change(screen.getByLabelText('Téléphone (facultatif)'), { target: { value: '470 12 34 56' } });
-    fireEvent.click(screen.getByRole('checkbox'));
+    fireEvent.click(screen.getByRole('checkbox', { name: /J'accepte/ }));
     fireEvent.click(screen.getByRole('button', { name: "Recevoir l'offre" }));
 
     await waitFor(() => expect(postSubmit).toHaveBeenCalled());
@@ -137,7 +137,7 @@ describe('LeadForm', () => {
     render(<LeadForm slug="abcd23" />);
     await fillValid();
     fireEvent.change(screen.getByLabelText('Téléphone (facultatif)'), { target: { value: '00 00 00 00 00' } });
-    fireEvent.click(screen.getByRole('checkbox'));
+    fireEvent.click(screen.getByRole('checkbox', { name: /J'accepte/ }));
     fireEvent.click(screen.getByRole('button', { name: "Recevoir l'offre" }));
 
     expect(await screen.findByText('Numéro de téléphone invalide')).toBeInTheDocument();
@@ -148,7 +148,7 @@ describe('LeadForm', () => {
     render(<LeadForm slug="abcd23" />);
     await fillValid();
     fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'marie@yopmail.com' } });
-    fireEvent.click(screen.getByRole('checkbox'));
+    fireEvent.click(screen.getByRole('checkbox', { name: /J'accepte/ }));
     fireEvent.click(screen.getByRole('button', { name: "Recevoir l'offre" }));
 
     expect(await screen.findByText('Merci d’utiliser une adresse e-mail permanente')).toBeInTheDocument();
@@ -161,7 +161,7 @@ describe('LeadForm', () => {
     const honeypot = container.querySelector('input[name="website"]') as HTMLInputElement;
     expect(honeypot).toBeTruthy();
     expect(honeypot.getAttribute('aria-hidden')).toBe('true');
-    fireEvent.click(screen.getByRole('checkbox'));
+    fireEvent.click(screen.getByRole('checkbox', { name: /J'accepte/ }));
     fireEvent.click(screen.getByRole('button', { name: "Recevoir l'offre" }));
     await waitFor(() => expect(postSubmit).toHaveBeenCalled());
     expect('website' in (postSubmit as Mock).mock.calls[0][0]).toBe(true);
