@@ -57,7 +57,12 @@ const SECURITY_HEADERS = [
   { key: "X-Frame-Options", value: "DENY" },
   { key: "X-Content-Type-Options", value: "nosniff" },
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
-  { key: "Permissions-Policy", value: "geolocation=(), microphone=(), camera=(), payment=()" },
+  // geolocation=(self), not (): the lead form's opt-in « Partager ma position précise »
+  // (#5) calls navigator.geolocation, and `()` disables it for every page — the call
+  // fails instantly and every visitor reads « Localisation refusée ». (self) allows
+  // our own origin only (the browser still prompts); third-party frames stay blocked.
+  // Keep in sync with netlify.toml.
+  { key: "Permissions-Policy", value: "geolocation=(self), microphone=(), camera=(), payment=()" },
   { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains; preload" },
 ];
 
