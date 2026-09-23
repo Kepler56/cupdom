@@ -41,8 +41,10 @@ export default function ConfidentialitePage() {
           <p>
             <strong>Ce que vous saisissez.</strong> Sur le formulaire d’une campagne : votre prénom, votre nom
             et votre adresse e-mail, ainsi que votre numéro de téléphone si vous choisissez de le renseigner —
-            il est facultatif. Nous conservons aussi la campagne concernée et votre consentement, horodaté et
-            rattaché à la version du texte que vous avez lu.
+            il est facultatif. Vous pouvez aussi, si vous l’activez explicitement, partager votre position précise
+            (géolocalisation) : c’est facultatif, désactivé par défaut, et enregistré seulement si vous y consentez
+            et que votre navigateur l’autorise. Nous conservons aussi la campagne concernée et votre consentement,
+            horodaté et rattaché à la version du texte que vous avez lu.
           </p>
           <p>
             <strong>Ce que le scan enregistre.</strong> Lorsqu’un QR Cupdom est scanné, nous enregistrons la
@@ -54,8 +56,9 @@ export default function ConfidentialitePage() {
             <strong>Ce que nous ne conservons pas.</strong> Ni votre adresse IP ni votre agent utilisateur ne
             sont stockés. Ils servent uniquement à calculer l’identifiant de visite — une empreinte
             <strong> SHA-256</strong> mêlant un secret et la date du jour, renouvelée chaque jour, dont on ne peut
-            pas remonter à vous. La localisation reste au niveau de la ville : nous n’avons ni adresse ni position
-            précise.
+            pas remonter à vous. La localisation issue d’un scan reste au niveau de la ville — sauf si vous avez
+            choisi, sur le formulaire, de partager votre position précise, auquel cas elle est conservée avec votre
+            contact et effacée en même temps que le reste de vos données.
           </p>
         </Section>
 

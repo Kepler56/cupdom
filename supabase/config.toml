@@ -16,3 +16,8 @@
 # quitte jamais le serveur.
 [functions.lead-submit]
 verify_jwt = false
+
+[functions.scan-alert]
+# Called by pg_net from detect_scan_drops() with only an x-cron-secret header (no user
+# JWT), so gateway JWT verification must be off. The function checks the secret itself.
+verify_jwt = false
