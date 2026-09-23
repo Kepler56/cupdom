@@ -1,4 +1,5 @@
 import { parseUserAgent, detectBot, buildVisitorHash, visitorDate } from './lib/detect.mjs';
+import { postWithRetry } from './lib/retry.mjs';
 
 // Public scan behaviour (Spec 2 §7):
 //   slug exists & active=true  -> 302 to the lead form /c/<slug> (Spec 3A); log ONE scan tagged 'Active'
@@ -71,16 +72,36 @@ export default async (request, context) => {
   };
 
   // ---- 4. Log WITHOUT blocking the response. A failed insert still lets the scanner through. ----
-  const logPromise = fetch(`${SUPABASE_URL}/rest/v1/qr_scans`, {
-    method: 'POST',
-    headers: {
-      apikey: SERVICE_KEY,
-      Authorization: `Bearer ${SERVICE_KEY}`,
-      'Content-Type': 'application/json',
-      Prefer: 'return=minimal',
-    },
-    body: JSON.stringify(row),
-  }).catch((e) => console.error('qr_scans insert failed', e));
+  // The write is retried with bounded, jittered backoff (see lib/retry.mjs): under a
+  // burst PostgREST's pool rejects with 503, and without a retry the scan was silently
+  // dropped. All of this runs AFTER the redirect below (context.waitUntil), so it never
+  // adds a millisecond to the scanner's latency. A write that still fails after the
+  // retries is logged as a structured, greppable line so the loss stops being invisible
+  // — an alert can watch the rate of `qr_scan_write_failed`.
+  const logPromise = postWithRetry(() =>
+    fetch(`${SUPABASE_URL}/rest/v1/qr_scans`, {
+      method: 'POST',
+      headers: {
+        apikey: SERVICE_KEY,
+        Authorization: `Bearer ${SERVICE_KEY}`,
+        'Content-Type': 'application/json',
+        Prefer: 'return=minimal',
+      },
+      body: JSON.stringify(row),
+    }),
+  ).then((result) => {
+    if (!result.ok) {
+      console.error(
+        JSON.stringify({
+          evt: 'qr_scan_write_failed',
+          slug,
+          status: result.status,
+          attempts: result.attempts,
+          error: result.error,
+        }),
+      );
+    }
+  });
   context.waitUntil(logPromise);
 
   // ---- 5. Hand off. Active -> lead form (Spec 3A); Terminée -> branded ended page. ----
