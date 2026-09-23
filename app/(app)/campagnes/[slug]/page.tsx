@@ -34,13 +34,19 @@ export default function CampaignDetailPage() {
     let active = true;
     setLoading(true);
     (async () => {
-      const list = await listScopeCampaigns();
-      const c = list.find((x) => x.slug === slug) ?? null;
-      const [statsMap, sources, leads] = await Promise.all([
+      // The campaign list, stats, funnel and leads are independent — stats/funnel/leads
+      // key off the URL slug, not off the list — so they run in ONE parallel batch
+      // instead of awaiting the list first. Netlify(Ohio)→Supabase(eu-west) makes each
+      // serial round-trip ~85ms; this removes one from every detail-page load. Behaviour
+      // is unchanged: the campaign is still resolved by `.find()` over the same
+      // scope-filtered list (a slug outside the current scope still reads « introuvable »).
+      const [list, statsMap, sources, leads] = await Promise.all([
+        listScopeCampaigns(),
         loadCampaignStats([slug]),
         loadFunnelSources(slug),
         listCampaignLeads(slug).catch(() => []),
       ]);
+      const c = list.find((x) => x.slug === slug) ?? null;
       if (!active) return;
       setCampaign(c);
       setStats(statsMap[slug] ?? emptyStats(slug));
