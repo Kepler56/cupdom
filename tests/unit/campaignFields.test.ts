@@ -20,6 +20,7 @@ function freshRow(): Record<string, unknown> {
     created_at: '2026-01-01T00:00:00Z',
     invested_amount_eur: null,
     venue: null,
+    product_image_url: null,
     deals: null,
   };
 }
@@ -67,7 +68,7 @@ const select = vi.fn((selectArg: string) => ({ order: () => order(selectArg) }))
 const from = vi.fn(() => ({ update, select }));
 vi.mock('@/lib/supabase/client', () => ({ createClient: () => ({ from }) }));
 
-const { setInvestedAmount, setVenue, listScopeCampaigns } = await import('@/lib/campaigns/campaigns');
+const { setInvestedAmount, setVenue, setProductImageUrl, listScopeCampaigns } = await import('@/lib/campaigns/campaigns');
 
 beforeEach(() => {
   eq.mockReset().mockResolvedValue({ error: null });
@@ -125,6 +126,39 @@ describe('setVenue', () => {
   });
 });
 
+describe('setProductImageUrl', () => {
+  it('writes an absolute https URL the portal can render', async () => {
+    await setProductImageUrl('nike-hiver', 'https://cdn.cupdom.fr/gourde.jpg');
+    expect(update).toHaveBeenCalledWith({ product_image_url: 'https://cdn.cupdom.fr/gourde.jpg' });
+    expect(eq).toHaveBeenCalledWith('slug', 'nike-hiver');
+  });
+
+  it('stores an emptied field as null, so the fiche renders its no-photo layout', async () => {
+    await setProductImageUrl('nike-hiver', '   ');
+    expect(update).toHaveBeenCalledWith({ product_image_url: null });
+  });
+
+  it('refuses a non-http scheme rather than storing it', async () => {
+    // The portal renders this straight into an <img src>. `javascript:` is the
+    // reason this is validated at all; `data:` would sail past a CSP that
+    // allows data: and put arbitrary bytes on the sponsor's page.
+    for (const bad of ['javascript:alert(1)', 'data:image/png;base64,AAA', 'ftp://x.fr/a.png']) {
+      await expect(setProductImageUrl('nike-hiver', bad), bad).rejects.toThrow();
+    }
+    expect(update).not.toHaveBeenCalled();
+  });
+
+  it('refuses a relative path — the portal is on another origin and would resolve it against itself', async () => {
+    await expect(setProductImageUrl('nike-hiver', '/images/gourde.jpg')).rejects.toThrow();
+    expect(update).not.toHaveBeenCalled();
+  });
+
+  it('throws when the write fails, so the input does not show a false enregistré ✓', async () => {
+    eq.mockResolvedValueOnce({ error: new Error('boom') });
+    await expect(setProductImageUrl('nike-hiver', 'https://cdn.cupdom.fr/a.jpg')).rejects.toThrow('boom');
+  });
+});
+
 describe('round trip: a value written via the setters survives a reload', () => {
   // This is the layer the brief warns fails silently: if `invested_amount_eur` or
   // `venue` is ever dropped from campaigns.ts's `COLS`, listScopeCampaigns's actual
@@ -141,5 +175,11 @@ describe('round trip: a value written via the setters survives a reload', () => 
     await setVenue('nike-hiver', '  Rex Club ');
     const [campaign] = await listScopeCampaigns();
     expect(campaign.venue).toBe('Rex Club');
+  });
+
+  it('product image: written, then read back through listScopeCampaigns', async () => {
+    await setProductImageUrl('nike-hiver', 'https://cdn.cupdom.fr/gourde.jpg');
+    const [campaign] = await listScopeCampaigns();
+    expect(campaign.productImageUrl).toBe('https://cdn.cupdom.fr/gourde.jpg');
   });
 });

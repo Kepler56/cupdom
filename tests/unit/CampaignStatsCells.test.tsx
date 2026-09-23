@@ -46,6 +46,7 @@ describe('CampaignsList headline', () => {
     createdAt: '2026-06-01T00:00:00Z',
     investedAmountEur: null,
     venue: null,
+    productImageUrl: null,
     ownerId: 'o1',
     ownerName: 'A',
     ownerColor: '#000',

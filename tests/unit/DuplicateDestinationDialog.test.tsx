@@ -15,6 +15,7 @@ const existing: Campaign = {
   createdAt: '2026-01-01T00:00:00Z',
   investedAmountEur: null,
   venue: null,
+  productImageUrl: null,
 };
 
 describe('DuplicateDestinationDialog', () => {

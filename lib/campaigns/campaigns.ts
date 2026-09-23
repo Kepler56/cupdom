@@ -23,13 +23,14 @@ type CampaignRow = {
   created_at: string;
   invested_amount_eur: number | null;
   venue: string | null;
+  product_image_url: string | null;
 };
 
 type JoinedRow = CampaignRow & {
   deals: { title: string | null; contacts: { owner_id: string; company: string | null } | null } | null;
 };
 
-const COLS = 'slug, sponsor_name, name, product, destination_url, active, deal_id, distributed_count, created_at, invested_amount_eur, venue';
+const COLS = 'slug, sponsor_name, name, product, destination_url, active, deal_id, distributed_count, created_at, invested_amount_eur, venue, product_image_url';
 const JOIN_COLS = `${COLS}, deals(title, contacts(owner_id, company))`;
 
 function mapCampaign(r: CampaignRow): Campaign {
@@ -45,6 +46,7 @@ function mapCampaign(r: CampaignRow): Campaign {
     createdAt: r.created_at,
     investedAmountEur: r.invested_amount_eur,
     venue: r.venue,
+    productImageUrl: r.product_image_url,
   };
 }
 
@@ -206,6 +208,43 @@ export async function setInvestedAmount(slug: string, amount: number | null): Pr
 export async function setVenue(slug: string, venue: string | null): Promise<void> {
   const cleaned = venue?.trim() ?? '';
   const { error } = await createClient().from('qr_campaigns').update({ venue: cleaned === '' ? null : cleaned }).eq('slug', slug);
+  if (error) throw error;
+}
+
+/**
+ * « Photo du produit » — the picture the portal's fiche renders (Spec 5 §4.3-E).
+ *
+ * Validated here rather than only in the input, because this value ends up in an
+ * `<img src>` on a page we do not control the rest of. http/https ONLY: a
+ * `javascript:` URL is the classic injection, and `data:` would let an arbitrary
+ * payload ride in under a CSP that permits data: for its own icons. THROWS on a
+ * bad scheme instead of silently coercing to null — a URL the owner pasted and
+ * that vanished without a word is worse than an error they can act on.
+ *
+ * Empty becomes null, like setVenue: the fiche has a real no-photo layout, and
+ * '' would render as a broken image icon.
+ */
+export async function setProductImageUrl(slug: string, url: string | null): Promise<void> {
+  const cleaned = url?.trim() ?? '';
+  let value: string | null = null;
+
+  if (cleaned !== '') {
+    let parsed: URL;
+    try {
+      // No normalizeUrl() here: that helper prepends https:// to a bare host,
+      // which would turn the relative path '/images/a.jpg' into the live host
+      // 'https://images/a.jpg'. An absolute URL is required, so parse strictly.
+      parsed = new URL(cleaned);
+    } catch {
+      throw new Error("L'adresse de la photo doit être une URL absolue (https://…).");
+    }
+    if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+      throw new Error("L'adresse de la photo doit commencer par http:// ou https://.");
+    }
+    value = parsed.toString();
+  }
+
+  const { error } = await createClient().from('qr_campaigns').update({ product_image_url: value }).eq('slug', slug);
   if (error) throw error;
 }
 

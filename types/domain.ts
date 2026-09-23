@@ -271,6 +271,7 @@ export interface Campaign {
   createdAt: string;            // ISO
   investedAmountEur: number | null; // owner-entered spend; drives the portal's cost-per-contact tile (Spec 5 §4.7)
   venue: string | null;         // owner-entered "Lieu / événement"; unlocks the portal's venue ranking (Spec 5 §4.8)
+  productImageUrl: string | null;  // owner-entered absolute http(s) URL of a product photo; rendered on the portal's fiche (Spec 5 §4.3-E)
 }
 
 // ── Campaign event log (Spec 2A §2/§6) ──────────────────────────────────────
