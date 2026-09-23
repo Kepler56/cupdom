@@ -5,6 +5,8 @@ import { useCanEdit } from '@/lib/scope';
 import type { ContactStatus } from '@/types/domain';
 
 vi.mock('@/lib/scope', () => ({ useCanEdit: vi.fn() }));
+// ContactLogo loads from Supabase and has its own tests (ContactLogo.test.tsx).
+vi.mock('@/components/molecules/ContactLogo', () => ({ ContactLogo: () => null }));
 vi.mock('@/lib/profiles', () => ({
   useProfiles: () => ({
     profiles: { o1: { id: 'o1', displayName: 'Eliah', color: '#18181b', email: 'eliah@cupdom.fr' } },

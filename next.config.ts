@@ -40,7 +40,8 @@ export function buildCsp(isDev: boolean): string {
     // would need per-request nonces from the framework.
     `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""} https://cdn.jsdelivr.net`,
     "style-src 'self' 'unsafe-inline'",
-    "img-src 'self' data:",
+    // Supabase Storage origin for sponsor logos (#8). Keep in sync with netlify.toml.
+    "img-src 'self' data: https://uqkbvwyspeqwlbulgzkj.supabase.co",
     "font-src 'self' data:",
     "connect-src 'self' https://*.supabase.co wss://*.supabase.co",
     "base-uri 'self'",

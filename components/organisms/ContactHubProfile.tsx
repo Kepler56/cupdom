@@ -7,6 +7,7 @@ import { Button } from '@/components/atoms/Button';
 import { Icon } from '@/components/atoms/Icon';
 import { StatutBadge } from '@/components/molecules/StatutBadge';
 import { OwnerChip } from '@/components/molecules/OwnerChip';
+import { ContactLogo } from '@/components/molecules/ContactLogo';
 import { useCanEdit } from '@/lib/scope';
 import { useProfiles } from '@/lib/profiles';
 import { contactDisplayName } from '@/lib/contacts';
@@ -77,6 +78,10 @@ export function ContactHubProfile({ contact, onEdit, onTransfer, onArchive, onPo
           <div className="text-text-muted">Secteur : {contact.sector ?? '—'}</div>
           <div className="text-text-muted">Taille : {contact.companySize ?? '—'}</div>
         </div>
+      </Section>
+
+      <Section title="Logo">
+        <ContactLogo contactId={contact.id} canEdit={canEdit} />
       </Section>
 
       {canEdit && (
