@@ -7,6 +7,7 @@ import { createClient } from '@supabase/supabase-js';
 import { isSpam, normaliseEmail, validateLead } from './validate.ts';
 import { CONSENT_TEXT_FR, CONSENT_VERSION } from './consent.ts';
 import { visitorDate } from './visitorDate.ts';
+import { withRetry } from '../_shared/retry.ts';
 
 // deno-lint-ignore no-explicit-any
 type Json = any;
@@ -98,46 +99,61 @@ Deno.serve(async (req: Request): Promise<Response> => {
   const errors = validateLead(input);
   if (Object.keys(errors).length > 0) return json({ errors }, 422);
 
-  // From here on, a DB hiccup must NOT block the reward — log and still redirect (mirrors scan.js).
+  // From here on, a DB hiccup must NOT block the reward — retry, then log and still
+  // redirect (mirrors scan.js). The writes run BEFORE the response, so retrying makes
+  // them MORE durable (the redirect waits for them) without delaying the common,
+  // successful path. Each write is safe to retry — see _shared/retry.ts. A write that
+  // still fails after the retries is logged as a structured, greppable line so a lost
+  // lead stops being invisible.
   try {
     const email = normaliseEmail(input.email);
 
     // 4. UPSERT the lead deduped on (campaign_slug, email) — refresh last_activity_at (AC-10).
-    const { data: lead } = await supabase
-      .from('leads')
-      .upsert(
-        {
-          campaign_slug: slug,
-          first_name: input.firstName.trim(),
-          last_name: input.lastName.trim(),
-          email,
-          // `|| null`, never ''. Phone is optional (2026-09) and an empty string
-          // is NOT an absent value here: migration 0008's anonymisation job
-          // selects rows where `phone is not null`, and the portal derives a
-          // lead's "anonymised" state from PII presence. Storing '' would make
-          // every phone-less lead look like it still holds a number, forever.
-          phone: input.phone.trim() || null,
-          last_activity_at: new Date().toISOString(),
-        },
-        { onConflict: 'campaign_slug,email' },
-      )
-      .select('id')
-      .single();
+    const leadRes = await withRetry(() =>
+      supabase
+        .from('leads')
+        .upsert(
+          {
+            campaign_slug: slug,
+            first_name: input.firstName.trim(),
+            last_name: input.lastName.trim(),
+            email,
+            // `|| null`, never ''. Phone is optional (2026-09) and an empty string
+            // is NOT an absent value here: migration 0008's anonymisation job
+            // selects rows where `phone is not null`, and the portal derives a
+            // lead's "anonymised" state from PII presence. Storing '' would make
+            // every phone-less lead look like it still holds a number, forever.
+            phone: input.phone.trim() || null,
+            last_activity_at: new Date().toISOString(),
+          },
+          { onConflict: 'campaign_slug,email' },
+        )
+        .select('id')
+        .single(),
+    );
+    if (leadRes.error) console.error(JSON.stringify({ evt: 'lead_write_failed', step: 'lead', slug }));
+    const lead = leadRes.data;
 
     // 5. Immutable consent record — server-derived text, NO IP (AC-9).
-    await supabase.from('lead_consents').insert({
-      lead_id: lead?.id ?? null,
-      campaign_slug: slug,
-      sponsor_name: sponsor,
-      consent_text: CONSENT_TEXT_FR(sponsor),
-      consent_version: CONSENT_VERSION,
-    });
+    const consentRes = await withRetry(() =>
+      supabase.from('lead_consents').insert({
+        lead_id: lead?.id ?? null,
+        campaign_slug: slug,
+        sponsor_name: sponsor,
+        consent_text: CONSENT_TEXT_FR(sponsor),
+        consent_version: CONSENT_VERSION,
+      }),
+    );
+    if (consentRes.error) console.error(JSON.stringify({ evt: 'lead_write_failed', step: 'consent', slug }));
 
     // 6. Funnel events: form_submit (AC-6) then offer_reached just before redirect (AC-7).
-    await supabase.from('funnel_events').insert([
-      { campaign_slug: slug, kind: 'form_submit', visitor_hash: visitorHash },
-      { campaign_slug: slug, kind: 'offer_reached', visitor_hash: visitorHash },
-    ]);
+    const funnelRes = await withRetry(() =>
+      supabase.from('funnel_events').insert([
+        { campaign_slug: slug, kind: 'form_submit', visitor_hash: visitorHash },
+        { campaign_slug: slug, kind: 'offer_reached', visitor_hash: visitorHash },
+      ]),
+    );
+    if (funnelRes.error) console.error(JSON.stringify({ evt: 'lead_write_failed', step: 'funnel', slug }));
   } catch (e) {
     console.error('lead-submit storage failed (forwarding anyway)', e);
   }
