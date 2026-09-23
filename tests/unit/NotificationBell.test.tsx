@@ -14,7 +14,7 @@ vi.mock('next/link', () => ({
 vi.mock('@/lib/notifications', () => ({ useNotifications: vi.fn() }));
 
 const notif = (id: string, readAt: string | null): Notification => ({
-  id, recipientId: 'u1', type: 'task_overdue', contactId: 'c1',
+  id, recipientId: 'u1', type: 'task_overdue', contactId: 'c1', campaignSlug: null,
   payload: { kind: 'task_overdue', taskId: 't', label: 'Appeler', dueDate: '2026-01-01', company: 'Acme' },
   createdAt: new Date().toISOString(), readAt,
 });

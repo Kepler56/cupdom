@@ -6,6 +6,7 @@ export type NotificationRow = {
   recipient_id: string;
   type: NotificationType;
   contact_id: string | null;
+  campaign_slug: string | null;
   payload: NotificationPayload;
   created_at: string;
   read_at: string | null;
@@ -18,6 +19,7 @@ export function mapNotificationRow(r: NotificationRow): Notification {
     recipientId: r.recipient_id,
     type: r.type,
     contactId: r.contact_id,
+    campaignSlug: r.campaign_slug,
     payload: r.payload,
     createdAt: r.created_at,
     readAt: r.read_at,

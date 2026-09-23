@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import type { LucideIcon } from 'lucide-react';
-import { AlertTriangle, Bell, Clock, Trash2 } from 'lucide-react';
+import { AlertTriangle, Bell, Clock, Trash2, TrendingDown } from 'lucide-react';
 import { Tag } from '@/components/atoms/Tag';
 import { Icon } from '@/components/atoms/Icon';
 import { timeAgoFr } from '@/lib/dates';
@@ -16,6 +16,7 @@ const ICON: Record<NotificationType, LucideIcon> = {
   task_overdue: AlertTriangle,
   gone_quiet: Clock,
   purge_warning: Trash2,
+  scan_drop: TrendingDown,
 };
 
 /** French primary line + status Tag, derived from the typed payload. */
@@ -34,6 +35,12 @@ function describe(n: Notification): { primary: string; tone: Tone; tagLabel: str
       };
     case 'purge_warning':
       return { primary: 'Suppression imminente', tone: 'danger', tagLabel: `J-${p.daysLeft}` };
+    case 'scan_drop':
+      return {
+        primary: `Chute de scans : ${p.sponsorName ?? 'campagne'}`,
+        tone: 'danger',
+        tagLabel: `${p.burstCount}→${p.dropCount}`,
+      };
   }
 }
 
@@ -44,9 +51,17 @@ interface NotificationItemProps {
 
 export function NotificationItem({ notification, onMarkRead }: NotificationItemProps) {
   const { primary, tone, tagLabel } = describe(notification);
-  const company = notification.payload.company;
+  // scan_drop is keyed on a campaign, not a contact: it carries a sponsorName
+  // rather than a `company`, and its link goes to the campaign, not a contact.
+  const p = notification.payload;
+  const company = p.kind === 'scan_drop' ? p.sponsorName : p.company;
   const unread = notification.readAt == null;
-  const href = notification.contactId ? `/contacts/${notification.contactId}` : '#';
+  const href =
+    p.kind === 'scan_drop'
+      ? `/campagnes/${p.campaignSlug}`
+      : notification.contactId
+        ? `/contacts/${notification.contactId}`
+        : '#';
 
   return (
     <Link

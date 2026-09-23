@@ -148,20 +148,26 @@ export interface ContactLink {
 }
 
 // ── Notifications (Spec 1D §5.10) ───────────────────────────────────────────
-export type NotificationType = 'reminder_due' | 'task_overdue' | 'gone_quiet' | 'purge_warning';
+export type NotificationType = 'reminder_due' | 'task_overdue' | 'gone_quiet' | 'purge_warning' | 'scan_drop';
 export type GoneQuietLevel = 'souple' | 'a_surveiller' | 'important' | 'urgent';
 
 export type NotificationPayload =
   | { kind: 'reminder_due'; reminderId: string; note: string | null; remindOn: string; company: string | null }
   | { kind: 'task_overdue'; taskId: string; label: string; dueDate: string; company: string | null }
   | { kind: 'gone_quiet'; level: GoneQuietLevel; silentDays: number; lastActivity: string; company: string | null }
-  | { kind: 'purge_warning'; daysLeft: number; purgeAfter: string; company: string | null };
+  | { kind: 'purge_warning'; daysLeft: number; purgeAfter: string; company: string | null }
+  // Scan-drop alert (#6): a live campaign's scans collapsed right after a peak.
+  // It is keyed on the campaign, not a contact, so it carries no `company`; the
+  // sponsor name comes from the campaign instead.
+  | { kind: 'scan_drop'; campaignSlug: string; sponsorName: string | null; burstCount: number; dropCount: number; windowMinutes: number; detectedAt: string };
 
 export interface Notification {
   id: string;
   recipientId: string;
   type: NotificationType;
   contactId: string | null;
+  // Set for campaign-keyed notifications (scan_drop); null for contact-keyed ones.
+  campaignSlug: string | null;
   payload: NotificationPayload;
   createdAt: string;
   readAt: string | null; // null = unread
@@ -194,6 +200,7 @@ export const NOTIF_TYPE_LABEL_FR: Record<NotificationType, string> = {
   task_overdue: 'Tâche en retard',
   gone_quiet: 'Prospect silencieux',
   purge_warning: 'Suppression imminente',
+  scan_drop: 'Chute de scans',
 };
 
 // ── Archive / purge (Spec 1E §5.9) ──────────────────────────────────────────

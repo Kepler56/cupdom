@@ -14,12 +14,12 @@ vi.mock('next/link', () => ({
 vi.mock('@/lib/notifications', () => ({ useNotifications: vi.fn() }));
 
 const reminder: Notification = {
-  id: 'r1', recipientId: 'u1', type: 'reminder_due', contactId: 'c1',
+  id: 'r1', recipientId: 'u1', type: 'reminder_due', contactId: 'c1', campaignSlug: null,
   payload: { kind: 'reminder_due', reminderId: 'x', note: 'Relancer', remindOn: '2026-06-01', company: 'Acme' },
   createdAt: new Date().toISOString(), readAt: null,
 };
 const task: Notification = {
-  id: 't1', recipientId: 'u1', type: 'task_overdue', contactId: 'c2',
+  id: 't1', recipientId: 'u1', type: 'task_overdue', contactId: 'c2', campaignSlug: null,
   payload: { kind: 'task_overdue', taskId: 'y', label: 'Appeler', dueDate: '2026-05-01', company: 'Globex' },
   createdAt: new Date().toISOString(), readAt: null,
 };

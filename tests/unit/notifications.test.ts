@@ -8,7 +8,7 @@ import {
 } from '@/lib/notifications.shared';
 
 const goneQuietRow: NotificationRow = {
-  id: 'n1', recipient_id: 'u1', type: 'gone_quiet', contact_id: 'c1',
+  id: 'n1', recipient_id: 'u1', type: 'gone_quiet', contact_id: 'c1', campaign_slug: null,
   payload: { kind: 'gone_quiet', level: 'urgent', silentDays: 31, lastActivity: '2026-01-01', company: 'Acme' },
   created_at: '2026-06-01', read_at: null,
 };
@@ -33,6 +33,27 @@ describe('notification helpers', () => {
     });
     expect(reminder.payload.kind).toBe('reminder_due');
     expect(task.payload.kind).toBe('task_overdue');
+  });
+
+  it('maps a campaign-keyed scan_drop row (campaign_slug, no contact)', () => {
+    const n = mapNotificationRow({
+      ...goneQuietRow,
+      type: 'scan_drop',
+      contact_id: null,
+      campaign_slug: 'rex-club-2026',
+      payload: {
+        kind: 'scan_drop',
+        campaignSlug: 'rex-club-2026',
+        sponsorName: 'Nike',
+        burstCount: 8,
+        dropCount: 0,
+        windowMinutes: 10,
+        detectedAt: '2026-09-23T01:00:00Z',
+      },
+    });
+    expect(n.contactId).toBeNull();
+    expect(n.campaignSlug).toBe('rex-club-2026');
+    expect(n.payload).toMatchObject({ kind: 'scan_drop', sponsorName: 'Nike', burstCount: 8, dropCount: 0 });
   });
 
   it('counts only unread (readAt == null)', () => {
