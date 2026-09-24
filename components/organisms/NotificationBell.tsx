@@ -1,15 +1,30 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { usePathname } from 'next/navigation';
 import { Bell } from 'lucide-react';
 import { Icon } from '@/components/atoms/Icon';
 import { NotificationItem } from '@/components/molecules/NotificationItem';
+import { ScanDropAlerts } from '@/components/molecules/ScanDropAlerts';
 import { useNotifications } from '@/lib/notifications';
+import { alertTitle, pendingScanDrops } from '@/lib/notifications.shared';
 
 export function NotificationBell() {
   const { items, unreadCount, markRead, markAllRead } = useNotifications();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const pathname = usePathname();
+  const pending = pendingScanDrops(items);
+
+  // Tab title carries pending scan-drops so the alert is visible from another tab.
+  // Re-applied on navigation because Next resets the title per page; the short
+  // delay lets that reset land first.
+  useEffect(() => {
+    const t = window.setTimeout(() => {
+      document.title = alertTitle(document.title, pending.length);
+    }, 50);
+    return () => window.clearTimeout(t);
+  }, [pending.length, pathname]);
 
   useEffect(() => {
     function onDoc(e: MouseEvent) {
@@ -28,6 +43,7 @@ export function NotificationBell() {
 
   return (
     <div className="relative" ref={ref}>
+      <ScanDropAlerts alerts={pending} onAcknowledge={(id) => void markRead(id)} />
       <button
         type="button"
         aria-label="Notifications"

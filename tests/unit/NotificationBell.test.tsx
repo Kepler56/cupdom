@@ -12,6 +12,7 @@ vi.mock('next/link', () => ({
   ),
 }));
 vi.mock('@/lib/notifications', () => ({ useNotifications: vi.fn() }));
+vi.mock('next/navigation', () => ({ usePathname: () => '/apercu' }));
 
 const notif = (id: string, readAt: string | null): Notification => ({
   id, recipientId: 'u1', type: 'task_overdue', contactId: 'c1', campaignSlug: null,
@@ -62,5 +63,38 @@ describe('NotificationBell', () => {
     fireEvent.click(screen.getByLabelText('Notifications'));
     fireEvent.click(screen.getAllByText(/Tâche en retard/)[0]);
     expect(markRead).toHaveBeenCalledWith('n1');
+  });
+
+  it('pins an unread scan-drop as an in-app alert; opening the campaign marks it read (#6)', () => {
+    const drop: Notification = {
+      id: 'd1', recipientId: 'u1', type: 'scan_drop', contactId: null, campaignSlug: 'rex',
+      payload: { kind: 'scan_drop', campaignSlug: 'rex', sponsorName: 'Boulanger', burstCount: 8, dropCount: 0, windowMinutes: 10, detectedAt: '2026-09-24T01:00:00Z' },
+      createdAt: '2026-09-24T01:00:00Z', readAt: null,
+    };
+    const { markRead } = setup({ items: [drop], unreadCount: 1 });
+    render(<NotificationBell />);
+    const alert = screen.getByRole('alert');
+    expect(alert).toHaveTextContent('Chute de scans : Boulanger');
+    expect(alert).toHaveTextContent('8 scans puis 0');
+    fireEvent.click(screen.getByRole('link', { name: 'Voir la campagne' }));
+    expect(markRead).toHaveBeenCalledWith('d1');
+  });
+
+  it('dismissing the alert marks it read', () => {
+    const drop: Notification = {
+      id: 'd2', recipientId: 'u1', type: 'scan_drop', contactId: null, campaignSlug: 'rex',
+      payload: { kind: 'scan_drop', campaignSlug: 'rex', sponsorName: 'Boulanger', burstCount: 8, dropCount: 0, windowMinutes: 10, detectedAt: '2026-09-24T01:00:00Z' },
+      createdAt: '2026-09-24T01:00:00Z', readAt: null,
+    };
+    const { markRead } = setup({ items: [drop], unreadCount: 1 });
+    render(<NotificationBell />);
+    fireEvent.click(screen.getByLabelText('Ignorer l’alerte'));
+    expect(markRead).toHaveBeenCalledWith('d2');
+  });
+
+  it('shows no in-app alert when there is no unread scan-drop', () => {
+    setup();
+    render(<NotificationBell />);
+    expect(screen.queryByRole('alert')).toBeNull();
   });
 });

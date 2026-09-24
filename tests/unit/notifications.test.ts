@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
+  alertTitle,
   mapNotificationRow,
   markAllReadLocal,
+  pendingScanDrops,
   markReadLocal,
   unreadCountOf,
   type NotificationRow,
@@ -72,5 +74,27 @@ describe('notification helpers', () => {
 
     const all = markAllReadLocal(items, '2026-06-03T00:00:00Z');
     expect(all.every((n) => n.readAt !== null)).toBe(true);
+  });
+
+  it('pendingScanDrops keeps only UNREAD scan_drop alerts, newest first', () => {
+    const drop = (id: string, createdAt: string, read: string | null) =>
+      mapNotificationRow({
+        ...goneQuietRow, id, type: 'scan_drop', contact_id: null, campaign_slug: 'x', created_at: createdAt, read_at: read,
+        payload: { kind: 'scan_drop', campaignSlug: 'x', sponsorName: 'Nike', burstCount: 8, dropCount: 0, windowMinutes: 10, detectedAt: createdAt },
+      });
+    const items = [
+      mapNotificationRow(goneQuietRow),
+      drop('old', '2026-09-23T01:00:00Z', null),
+      drop('new', '2026-09-23T02:00:00Z', null),
+      drop('seen', '2026-09-23T03:00:00Z', '2026-09-23T03:05:00Z'),
+    ];
+    expect(pendingScanDrops(items).map((n) => n.id)).toEqual(['new', 'old']);
+  });
+
+  it('alertTitle prefixes the pending count, replaces rather than stacks, and clears at 0', () => {
+    expect(alertTitle('Aperçu — Cupdom', 2)).toBe('(2) ⚠️ Aperçu — Cupdom');
+    expect(alertTitle('(2) ⚠️ Aperçu — Cupdom', 3)).toBe('(3) ⚠️ Aperçu — Cupdom');
+    expect(alertTitle('(3) ⚠️ Aperçu — Cupdom', 0)).toBe('Aperçu — Cupdom');
+    expect(alertTitle('Aperçu — Cupdom', 0)).toBe('Aperçu — Cupdom');
   });
 });

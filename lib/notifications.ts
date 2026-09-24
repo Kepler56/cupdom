@@ -11,6 +11,9 @@ import {
 } from '@/lib/notifications.shared';
 import type { Notification } from '@/types/domain';
 
+/** How often the open CRM re-checks for notifications (scan-drop alerts are written by a 5-min cron). */
+export const POLL_MS = 60_000;
+
 export interface UseNotifications {
   items: Notification[];
   unreadCount: number;
@@ -45,6 +48,23 @@ export function useNotifications(): UseNotifications {
     })();
     return () => {
       active = false;
+    };
+  }, [fetchList]);
+
+  // LIVE UPDATES. The bell used to load once, when the CRM opened, so a scan-drop
+  // alert written by the cron job mid-event stayed invisible until a full reload.
+  // Poll the (cheap) list every POLL_MS while the tab is visible, and immediately
+  // when the member comes back to the tab. A hidden tab does not poll — nobody is
+  // looking, and the visibility catch-up covers the gap the moment they return.
+  useEffect(() => {
+    const tick = () => {
+      if (document.visibilityState === 'visible') void fetchList();
+    };
+    const id = window.setInterval(tick, POLL_MS);
+    document.addEventListener('visibilitychange', tick);
+    return () => {
+      window.clearInterval(id);
+      document.removeEventListener('visibilitychange', tick);
     };
   }, [fetchList]);
 
