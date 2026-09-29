@@ -5,9 +5,42 @@ import type { LeadErrors, LeadInput } from '@/lib/public/validation';
 
 const ENDPOINT = process.env.NEXT_PUBLIC_LEAD_SUBMIT_URL ?? '';
 
+export interface PublicCampaign {
+  name: string;
+  product: string;
+  imageUrl: string | null;
+  rewardType: 'site' | 'promo';
+}
+
+export const EMPTY_CAMPAIGN: PublicCampaign = Object.freeze({ name: '', product: '', imageUrl: null, rewardType: 'site' });
+
 export interface FormViewResult {
   active: boolean;
   sponsor: string;
+  campaign: PublicCampaign;
+}
+
+export type PromoReply = { link: string; emailed: boolean; code?: string };
+
+function httpOrNull(v: unknown): string | null {
+  if (typeof v !== 'string') return null;
+  try {
+    const u = new URL(v);
+    return u.protocol === 'http:' || u.protocol === 'https:' ? v : null;
+  } catch {
+    return null;
+  }
+}
+
+function parseCampaign(raw: unknown): PublicCampaign {
+  if (!raw || typeof raw !== 'object') return EMPTY_CAMPAIGN;
+  const c = raw as Record<string, unknown>;
+  return {
+    name: typeof c.name === 'string' ? c.name : '',
+    product: typeof c.product === 'string' ? c.product : '',
+    imageUrl: httpOrNull(c.imageUrl),
+    rewardType: c.rewardType === 'promo' ? 'promo' : 'site',
+  };
 }
 
 export interface SubmitPayload extends LeadInput {
@@ -19,7 +52,7 @@ export interface SubmitPayload extends LeadInput {
   longitude?: number;
 }
 
-export type SubmitResult = { redirect: string } | { errors: LeadErrors };
+export type SubmitResult = { redirect: string } | { promo: PromoReply } | { errors: LeadErrors };
 
 async function post(body: unknown): Promise<Response> {
   return fetch(ENDPOINT, {
@@ -37,11 +70,15 @@ async function post(body: unknown): Promise<Response> {
 export async function postFormView(slug: string): Promise<FormViewResult> {
   try {
     const res = await post({ slug, kind: 'form_view' });
-    if (!res.ok) return { active: false, sponsor: '' };
-    const data = (await res.json()) as Partial<FormViewResult>;
-    return { active: data.active === true, sponsor: typeof data.sponsor === 'string' ? data.sponsor : '' };
+    if (!res.ok) return { active: false, sponsor: '', campaign: EMPTY_CAMPAIGN };
+    const data = (await res.json()) as Record<string, unknown>;
+    return {
+      active: data.active === true,
+      sponsor: typeof data.sponsor === 'string' ? data.sponsor : '',
+      campaign: parseCampaign(data.campaign),
+    };
   } catch {
-    return { active: false, sponsor: '' };
+    return { active: false, sponsor: '', campaign: EMPTY_CAMPAIGN };
   }
 }
 
@@ -53,6 +90,10 @@ export async function postSubmit(payload: SubmitPayload): Promise<SubmitResult> 
   const res = await post(payload);
   const data = (await res.json().catch(() => ({}))) as SubmitResult;
   if (res.ok && 'redirect' in data) return { redirect: data.redirect };
+  if (res.ok && 'promo' in data && data.promo && typeof data.promo.link === 'string') {
+    const p = data.promo;
+    return { promo: { link: p.link, emailed: p.emailed !== false, ...(typeof p.code === 'string' ? { code: p.code } : {}) } };
+  }
   if ('errors' in data) return { errors: data.errors };
   return { errors: { email: 'Une erreur est survenue. Réessayez.' } };
 }
