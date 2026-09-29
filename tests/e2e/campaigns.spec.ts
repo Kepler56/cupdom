@@ -80,7 +80,7 @@ test.describe('2A campaigns end-to-end', () => {
 
     // Destination edit keeps the slug/QR (AC-13).
     await row.getByRole('button', { name: "Plus d'actions" }).click();
-    await page.getByRole('button', { name: 'Modifier la destination' }).click();
+    await page.getByRole('button', { name: 'Modifier la récompense' }).click();
     await page.getByLabel('Destination (http/https)').fill(`${DEST}-v2`);
     await page.getByRole('button', { name: 'Enregistrer' }).click();
     await row.getByRole('button', { name: 'Voir le QR' }).click();

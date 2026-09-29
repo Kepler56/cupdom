@@ -3,12 +3,13 @@
 import { useEffect, useState } from 'react';
 import { Button } from '@/components/atoms/Button';
 import { Input } from '@/components/atoms/Input';
+import { REWARD_ERROR_FR, RewardFields } from '@/components/molecules/RewardFields';
 import { DuplicateDestinationDialog } from '@/components/molecules/DuplicateDestinationDialog';
 import { useScope } from '@/lib/scope';
 import { contactDisplayName, listContactsWithStatus } from '@/lib/contacts';
 import { listDeals } from '@/lib/deals';
 import { createCampaign, setCampaignState, type CampaignCreateInput } from '@/lib/campaigns/campaigns';
-import type { Campaign, ContactStatus, Deal } from '@/types/domain';
+import type { Campaign, ContactStatus, Deal, RewardType } from '@/types/domain';
 
 const selectCls =
   'w-full rounded-input border border-border-strong bg-surface px-3 py-2 text-sm text-text focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary';
@@ -31,6 +32,8 @@ export function CampaignCreateForm({ onCreated, onClose }: CampaignCreateFormPro
   const [dealId, setDealId] = useState('');
   const [name, setName] = useState('');
   const [destination, setDestination] = useState('');
+  const [rewardType, setRewardType] = useState<RewardType>('site');
+  const [promoCode, setPromoCode] = useState('');
   const [product, setProduct] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -73,8 +76,8 @@ export function CampaignCreateForm({ onCreated, onClose }: CampaignCreateFormPro
       name,
       destinationUrl: destination,
       product,
-      rewardType: 'site',
-      promoCode: '',
+      rewardType,
+      promoCode,
     };
   }
 
@@ -85,12 +88,8 @@ export function CampaignCreateForm({ onCreated, onClose }: CampaignCreateFormPro
     setError(null);
     try {
       const out = await createCampaign(input, { force });
-      if (out.status === 'invalid_url') {
-        setError('Lien invalide : http/https requis.');
-        return;
-      }
-      if (out.status === 'missing_code' || out.status === 'code_too_long') {
-        setError('Code promo invalide.'); // unreachable until the form gains a promo mode
+      if (out.status === 'invalid_url' || out.status === 'missing_code' || out.status === 'code_too_long') {
+        setError(REWARD_ERROR_FR[out.status]);
         return;
       }
       if (out.status === 'ok') {
@@ -161,11 +160,15 @@ export function CampaignCreateForm({ onCreated, onClose }: CampaignCreateFormPro
           </label>
 
           <Input label="Nom de la campagne" value={name} onChange={(e) => setName(e.target.value)} placeholder="Nike Été 2026" />
-          <Input
-            label="Destination (http/https)"
-            value={destination}
-            onChange={(e) => setDestination(e.target.value)}
-            placeholder="https://…"
+          <RewardFields
+            rewardType={rewardType}
+            promoCode={promoCode}
+            destination={destination}
+            onChange={(p) => {
+              if (p.rewardType !== undefined) setRewardType(p.rewardType);
+              if (p.promoCode !== undefined) setPromoCode(p.promoCode);
+              if (p.destination !== undefined) setDestination(p.destination);
+            }}
           />
           <Input label="Produit (optionnel)" value={product} onChange={(e) => setProduct(e.target.value)} placeholder="gourde, tote…" />
         </div>

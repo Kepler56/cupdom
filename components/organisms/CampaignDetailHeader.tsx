@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Power, QrCode } from 'lucide-react';
 import { Button } from '@/components/atoms/Button';
 import { Icon } from '@/components/atoms/Icon';
+import { Tag } from '@/components/atoms/Tag';
 import { OwnerChip } from '@/components/molecules/OwnerChip';
 import { CampaignStateBadge } from '@/components/molecules/CampaignStateBadge';
 import { DistributedInput } from '@/components/molecules/DistributedInput';
@@ -48,6 +49,7 @@ export function CampaignDetailHeader({ campaign, canEdit, ownerName, ownerColor,
         <div className="flex items-center gap-3">
           <h1 className="text-lg font-semibold text-text">{campaign.name ?? campaign.sponsorName}</h1>
           <CampaignStateBadge state={campaign.state} />
+          <Tag tone="neutral">{campaign.rewardType === 'promo' ? `Code promo : ${campaign.promoCode ?? ''}` : 'Site web'}</Tag>
         </div>
         <p className="text-xs text-text-muted">
           Sponsor : {campaign.contactCompany ?? campaign.sponsorName}

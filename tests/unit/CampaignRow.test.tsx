@@ -5,7 +5,10 @@ import { useCanEdit } from '@/lib/scope';
 import type { CampaignRowVM } from '@/types/domain';
 
 vi.mock('@/lib/scope', () => ({ useCanEdit: vi.fn() }));
-vi.mock('@/lib/campaigns/campaigns', () => ({ setCampaignState: vi.fn() }));
+vi.mock('@/lib/campaigns/campaigns', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/campaigns/campaigns')>()),
+  setCampaignState: vi.fn(),
+}));
 
 const base: CampaignRowVM = {
   slug: 'abcd23',

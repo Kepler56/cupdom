@@ -9,7 +9,7 @@ import { OwnerChip } from '@/components/molecules/OwnerChip';
 import { CampaignStateBadge } from '@/components/molecules/CampaignStateBadge';
 import { CampaignStatsCells } from '@/components/molecules/CampaignStatsCells';
 import { QrDialog } from '@/components/molecules/QrDialog';
-import { DestinationEditDialog } from '@/components/molecules/DestinationEditDialog';
+import { RewardEditDialog } from '@/components/molecules/RewardEditDialog';
 import { DeleteCampaignDialog } from '@/components/molecules/DeleteCampaignDialog';
 import { CampaignEventLog } from '@/components/organisms/CampaignEventLog';
 import { useCanEdit } from '@/lib/scope';
@@ -154,7 +154,7 @@ export function CampaignRow({ row, onChanged }: CampaignRowProps) {
                       }}
                       className="flex w-full items-center gap-2 px-3 py-2 text-left text-text hover:bg-canvas"
                     >
-                      <Icon icon={Pencil} size={14} /> Modifier la destination
+                      <Icon icon={Pencil} size={14} /> Modifier la récompense
                     </button>
                     <button
                       type="button"
@@ -177,7 +177,7 @@ export function CampaignRow({ row, onChanged }: CampaignRowProps) {
         {qrOpen && <QrDialog campaign={row} onClose={() => setQrOpen(false)} />}
         {historyOpen && <CampaignEventLog slug={row.slug} onClose={() => setHistoryOpen(false)} />}
         {editOpen && (
-          <DestinationEditDialog
+          <RewardEditDialog
             campaign={row}
             onClose={() => setEditOpen(false)}
             onDone={() => {

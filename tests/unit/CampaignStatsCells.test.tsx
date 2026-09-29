@@ -6,7 +6,10 @@ import type { CampaignRowVM, CampaignStats } from '@/types/domain';
 
 // CampaignsList → CampaignRow calls useCanEdit; mock it (no ScopeProvider in unit render).
 vi.mock('@/lib/scope', () => ({ useCanEdit: () => false }));
-vi.mock('@/lib/campaigns/campaigns', () => ({ setCampaignState: vi.fn() }));
+vi.mock('@/lib/campaigns/campaigns', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/campaigns/campaigns')>()),
+  setCampaignState: vi.fn(),
+}));
 
 const stats = (over: Partial<CampaignStats> = {}): CampaignStats => ({
   slug: 's',
