@@ -3,21 +3,14 @@
 import { useState } from 'react';
 import { Button } from '@/components/atoms/Button';
 import type { PromoReply } from '@/lib/public/leadClient';
-
-function httpOrNull(v: string): string | null {
-  try {
-    const u = new URL(v);
-    return u.protocol === 'http:' || u.protocol === 'https:' ? v : null;
-  } catch {
-    return null;
-  }
-}
+import { httpOrNull } from '@/lib/public/safeUrl';
 
 /** Promo confirmation (spec §4.4). Shows the code only when the email could not be sent. */
 export function PromoSentCard({ reply, email }: { reply: PromoReply; email: string }) {
   const link = httpOrNull(reply.link);
   const [copied, setCopied] = useState(false);
   const showCode = !reply.emailed && reply.code;
+  const neitherSentNorShown = !reply.emailed && !reply.code;
 
   return (
     <div className="w-full max-w-md rounded-card border border-border bg-surface p-8 text-center shadow-sm">
@@ -32,11 +25,18 @@ export function PromoSentCard({ reply, email }: { reply: PromoReply; email: stri
             variant="secondary"
             className="mt-3"
             onClick={() => {
-              void navigator.clipboard?.writeText(reply.code ?? '').then(() => setCopied(true));
+              void navigator.clipboard?.writeText(reply.code ?? '').then(() => setCopied(true)).catch(() => {});
             }}
           >
             {copied ? 'Copié !' : 'Copier le code'}
           </Button>
+        </>
+      ) : neitherSentNorShown ? (
+        <>
+          <h1 className="text-xl font-semibold text-text">Merci&nbsp;!</h1>
+          <p className="mt-2 text-sm text-text-body">
+            Votre participation est enregistrée. Si vous ne recevez pas votre code, contactez la marque.
+          </p>
         </>
       ) : (
         <>

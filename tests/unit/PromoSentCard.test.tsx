@@ -20,6 +20,13 @@ describe('PromoSentCard', () => {
     expect(screen.getByText('C10')).toBeInTheDocument();
   });
 
+  it('emailed false and no code: no false email claim, neutral thanks', () => {
+    render(<PromoSentCard email="m@g.com" reply={{ link: 'https://nike.fr', emailed: false }} />);
+    expect(screen.getByRole('heading', { name: /Merci/ })).toBeInTheDocument();
+    expect(screen.getByText(/contactez la marque/)).toBeInTheDocument();
+    expect(screen.queryByText(/Nous vous avons envoyé/)).not.toBeInTheDocument();
+  });
+
   it('never renders a non-http link', () => {
     render(<PromoSentCard email="m@g.com" reply={{ link: 'javascript:alert(1)', emailed: true }} />);
     expect(screen.queryByRole('link', { name: 'Utiliser mon code' })).not.toBeInTheDocument();

@@ -207,4 +207,14 @@ describe('LeadForm — reward modes', () => {
     await screen.findByLabelText('Prénom');
     expect(screen.queryByText(/code promo/)).not.toBeInTheDocument();
   });
+
+  it('never navigates to a non-http redirect', async () => {
+    (postSubmit as Mock).mockResolvedValue({ redirect: 'javascript:alert(1)' });
+    render(<LeadForm slug="abcd23" />);
+    await fillValid();
+    fireEvent.click(screen.getByRole('checkbox', { name: /J'accepte/ }));
+    fireEvent.click(screen.getByRole('button', { name: "Recevoir l'offre" }));
+    expect(await screen.findByText('Une erreur est survenue. Réessayez.')).toBeInTheDocument();
+    expect(assign).not.toHaveBeenCalled();
+  });
 });

@@ -1,6 +1,7 @@
 // Browser client for the public lead form (Spec 3A §4). Holds NO keys — it talks only to
 // the public Edge Function URL (NEXT_PUBLIC_LEAD_SUBMIT_URL). The service-role key lives only
 // inside that function. Every write/decision is server-side; this just relays.
+import { httpOrNull } from '@/lib/public/safeUrl';
 import type { LeadErrors, LeadInput } from '@/lib/public/validation';
 
 const ENDPOINT = process.env.NEXT_PUBLIC_LEAD_SUBMIT_URL ?? '';
@@ -21,16 +22,6 @@ export interface FormViewResult {
 }
 
 export type PromoReply = { link: string; emailed: boolean; code?: string };
-
-function httpOrNull(v: unknown): string | null {
-  if (typeof v !== 'string') return null;
-  try {
-    const u = new URL(v);
-    return u.protocol === 'http:' || u.protocol === 'https:' ? v : null;
-  } catch {
-    return null;
-  }
-}
 
 function parseCampaign(raw: unknown): PublicCampaign {
   if (!raw || typeof raw !== 'object') return EMPTY_CAMPAIGN;

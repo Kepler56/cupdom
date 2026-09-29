@@ -10,6 +10,7 @@ import { EndedCampaignCard } from '@/components/public/EndedCampaignCard';
 import { CONSENT_VERSION } from '@/lib/public/consent';
 import { PhoneField, type PhoneValue } from '@/components/public/PhoneField';
 import { toE164, validateLead, type LeadErrors } from '@/lib/public/validation';
+import { httpOrNull } from '@/lib/public/safeUrl';
 import { CampaignCard } from '@/components/public/CampaignCard';
 import { PromoSentCard } from '@/components/public/PromoSentCard';
 import { EMPTY_CAMPAIGN, postFormView, postSubmit, type PromoReply, type PublicCampaign } from '@/lib/public/leadClient';
@@ -97,8 +98,13 @@ export function LeadForm({ slug }: { slug: string }) {
     setSubmitting(false);
 
     if ('redirect' in result) {
+      const target = httpOrNull(result.redirect); // never navigate to a non-http(s) scheme
+      if (!target) {
+        setErrors({ email: 'Une erreur est survenue. Réessayez.' });
+        return;
+      }
       setPhase('done');
-      window.location.assign(result.redirect); // the reward (AC-6/7)
+      window.location.assign(target); // the reward (AC-6/7)
     } else if ('promo' in result) {
       setPromo(result.promo);
       setPhase('done');
