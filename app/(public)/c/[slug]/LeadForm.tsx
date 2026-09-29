@@ -10,7 +10,9 @@ import { EndedCampaignCard } from '@/components/public/EndedCampaignCard';
 import { CONSENT_VERSION } from '@/lib/public/consent';
 import { PhoneField, type PhoneValue } from '@/components/public/PhoneField';
 import { toE164, validateLead, type LeadErrors } from '@/lib/public/validation';
-import { postFormView, postSubmit } from '@/lib/public/leadClient';
+import { CampaignCard } from '@/components/public/CampaignCard';
+import { PromoSentCard } from '@/components/public/PromoSentCard';
+import { EMPTY_CAMPAIGN, postFormView, postSubmit, type PromoReply, type PublicCampaign } from '@/lib/public/leadClient';
 
 // Visuals are intentionally minimal — Spec 4 owns the form polish. Logic/validation/a11y are the contract.
 type Phase = 'loading' | 'inactive' | 'active' | 'done';
@@ -18,6 +20,8 @@ type Phase = 'loading' | 'inactive' | 'active' | 'done';
 export function LeadForm({ slug }: { slug: string }) {
   const [phase, setPhase] = useState<Phase>('loading');
   const [sponsor, setSponsor] = useState('');
+  const [campaign, setCampaign] = useState<PublicCampaign>(EMPTY_CAMPAIGN);
+  const [promo, setPromo] = useState<PromoReply | null>(null);
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
@@ -38,6 +42,7 @@ export function LeadForm({ slug }: { slug: string }) {
     viewSent.current = true;
     postFormView(slug).then((res) => {
       setSponsor(res.sponsor);
+      setCampaign(res.campaign);
       setPhase(res.active ? 'active' : 'inactive');
     });
   }, [slug]);
@@ -94,6 +99,9 @@ export function LeadForm({ slug }: { slug: string }) {
     if ('redirect' in result) {
       setPhase('done');
       window.location.assign(result.redirect); // the reward (AC-6/7)
+    } else if ('promo' in result) {
+      setPromo(result.promo);
+      setPhase('done');
     } else {
       setErrors(result.errors);
     }
@@ -110,6 +118,7 @@ export function LeadForm({ slug }: { slug: string }) {
   if (phase === 'inactive') return <EndedCampaignCard />;
 
   if (phase === 'done') {
+    if (promo) return <PromoSentCard reply={promo} email={email.trim()} />;
     return (
       <div className="w-full max-w-md rounded-card border border-border bg-surface p-8 text-center shadow-sm">
         <h1 className="text-xl font-semibold text-text">Merci&nbsp;!</h1>
@@ -120,13 +129,7 @@ export function LeadForm({ slug }: { slug: string }) {
 
   return (
     <div className="w-full max-w-md rounded-card border border-border bg-surface p-6 shadow-sm sm:p-8">
-      <span
-        className="mb-4 flex h-11 w-11 items-center justify-center rounded-input bg-primary text-lg font-bold uppercase text-primary-contrast"
-        aria-hidden
-      >
-        {sponsor.trim().charAt(0) || 'C'}
-      </span>
-      <h1 className="mb-1 text-xl font-semibold text-text">Pour accéder à l&apos;offre de {sponsor}</h1>
+      <CampaignCard campaign={campaign} sponsor={sponsor} />
       <p className="mb-6 text-sm text-text-muted">
         Renseignez vos coordonnées pour accéder à l&apos;offre. C&apos;est rapide et sans engagement.
       </p>
@@ -148,7 +151,13 @@ export function LeadForm({ slug }: { slug: string }) {
             autoComplete="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
+            aria-describedby={campaign.rewardType === 'promo' ? 'promo-email-note' : undefined}
           />
+          {campaign.rewardType === 'promo' && (
+            <p id="promo-email-note" className="mt-1 text-xs text-text-muted">
+              Nous utiliserons cet e-mail pour vous envoyer votre code promo.
+            </p>
+          )}
           <FieldError message={errors.email} />
         </div>
         <PhoneField {...phone} onChange={setPhone} error={errors.phone} />
@@ -194,7 +203,7 @@ export function LeadForm({ slug }: { slug: string }) {
         />
 
         <Button type="submit" disabled={submitting} className="mt-2 w-full">
-          {submitting ? 'Envoi…' : "Recevoir l'offre"}
+          {submitting ? 'Envoi…' : campaign.rewardType === 'promo' ? 'Recevoir mon code promo' : "Recevoir l'offre"}
         </Button>
       </form>
     </div>

@@ -4,7 +4,8 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { LeadForm } from '@/app/(public)/c/[slug]/LeadForm';
 import { postFormView, postSubmit } from '@/lib/public/leadClient';
 
-vi.mock('@/lib/public/leadClient', () => ({
+vi.mock('@/lib/public/leadClient', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/public/leadClient')>()),
   postFormView: vi.fn(),
   postSubmit: vi.fn(),
 }));
@@ -12,7 +13,11 @@ vi.mock('@/lib/public/leadClient', () => ({
 const assign = vi.fn();
 
 beforeEach(() => {
-  (postFormView as Mock).mockReset().mockResolvedValue({ active: true, sponsor: 'Nike' });
+  (postFormView as Mock).mockReset().mockResolvedValue({
+    active: true,
+    sponsor: 'Nike',
+    campaign: { name: 'Été 2026', product: 'Gourde', imageUrl: null, rewardType: 'site' },
+  });
   (postSubmit as Mock).mockReset().mockResolvedValue({ redirect: 'https://nike.fr/ete' });
   assign.mockReset();
   Object.defineProperty(window, 'location', { configurable: true, value: { assign, href: '' } });
@@ -172,5 +177,34 @@ describe('LeadForm', () => {
     render(<LeadForm slug="dead99" />);
     expect(await screen.findByText("Cette campagne n'est plus active")).toBeInTheDocument();
     expect(screen.queryByLabelText('Prénom')).not.toBeInTheDocument();
+  });
+});
+
+describe('LeadForm — reward modes', () => {
+  it('shows which campaign the participant is joining', async () => {
+    render(<LeadForm slug="abcd23" />);
+    expect(await screen.findByRole('heading', { name: 'Été 2026' })).toBeInTheDocument();
+  });
+
+  it('promo: explains the email use, then shows the congrats page instead of redirecting', async () => {
+    (postFormView as Mock).mockResolvedValue({
+      active: true,
+      sponsor: 'Nike',
+      campaign: { name: 'Été 2026', product: 'Gourde', imageUrl: null, rewardType: 'promo' },
+    });
+    (postSubmit as Mock).mockResolvedValue({ promo: { link: 'https://nike.fr/panier', emailed: true } });
+    render(<LeadForm slug="abcd23" />);
+    expect(await screen.findByText('Nous utiliserons cet e-mail pour vous envoyer votre code promo.')).toBeInTheDocument();
+    await fillValid();
+    fireEvent.click(screen.getByRole('checkbox', { name: /J'accepte/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Recevoir mon code promo' }));
+    expect(await screen.findByRole('heading', { name: /Félicitations/ })).toBeInTheDocument();
+    expect(assign).not.toHaveBeenCalled();
+  });
+
+  it('site: no promo note, still redirects', async () => {
+    render(<LeadForm slug="abcd23" />);
+    await screen.findByLabelText('Prénom');
+    expect(screen.queryByText(/code promo/)).not.toBeInTheDocument();
   });
 });
