@@ -4,6 +4,7 @@
 // Not part of the Next typecheck (Deno globals + URL imports) — excluded in tsconfig.
 import { createClient } from '@supabase/supabase-js';
 import { buildDigestEmail, type DigestItems } from './email.ts';
+import { DEFAULT_FROM, sendEmail } from '../_shared/resend.ts';
 
 // deno-lint-ignore no-explicit-any
 type Json = any;
@@ -17,8 +18,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
     Deno.env.get('SUPABASE_URL')!,
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
   );
-  const resendKey = Deno.env.get('RESEND_API_KEY')!;
-  const from = Deno.env.get('DIGEST_FROM') ?? 'Cupdom <crm@cupdom.fr>';
+  const cfg = { apiKey: Deno.env.get('RESEND_API_KEY') ?? '', from: Deno.env.get('DIGEST_FROM') ?? DEFAULT_FROM };
 
   const { data: profiles } = await supabase.from('profiles').select('id, email, display_name');
 
@@ -51,20 +51,11 @@ Deno.serve(async (req: Request): Promise<Response> => {
       continue;
     }
 
-    try {
-      const res = await fetch('https://api.resend.com/emails', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${resendKey}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ from, to: p.email, subject: email.subject, html: email.html, text: email.text }),
-      });
-      if (res.ok) sent++;
-      else {
-        skipped++;
-        console.error('resend failed', await res.text());
-      }
-    } catch (e) {
+    const r = await sendEmail({ to: p.email, subject: email.subject, html: email.html, text: email.text }, cfg);
+    if (r.ok) sent++;
+    else {
       skipped++;
-      console.error('send error', e);
+      console.error('resend failed', r.status, r.error);
     }
   }
 
