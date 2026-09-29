@@ -266,6 +266,9 @@ export interface ExportDataset<T = unknown> {
 export type CampaignState = 'Active' | 'Terminée';
 export const CAMPAIGN_STATES: readonly CampaignState[] = ['Active', 'Terminée'] as const;
 
+/** How a campaign rewards a participant (spec 2026-09-29 §3.1). */
+export type RewardType = 'site' | 'promo';
+
 export interface Campaign {
   slug: string;                 // opaque, immutable PK (6–8 char base32-ish)
   sponsorName: string;          // = linked contact's company at insert time (NOT NULL in DB)
@@ -279,6 +282,10 @@ export interface Campaign {
   investedAmountEur: number | null; // owner-entered spend; drives the portal's cost-per-contact tile (Spec 5 §4.7)
   venue: string | null;         // owner-entered "Lieu / événement"; unlocks the portal's venue ranking (Spec 5 §4.8)
   productImageUrl: string | null;  // owner-entered absolute http(s) URL of a product photo; rendered on the portal's fiche (Spec 5 §4.3-E)
+  /** 'site' = redirect to destinationUrl; 'promo' = email promoCode, destinationUrl is where to use it. */
+  rewardType: RewardType;
+  /** Shared promo code. Kept when switching back to 'site'; only meaningful in 'promo'. */
+  promoCode: string | null;
 }
 
 // ── Campaign event log (Spec 2A §2/§6) ──────────────────────────────────────

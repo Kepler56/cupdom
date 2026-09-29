@@ -73,6 +73,8 @@ export function CampaignCreateForm({ onCreated, onClose }: CampaignCreateFormPro
       name,
       destinationUrl: destination,
       product,
+      rewardType: 'site',
+      promoCode: '',
     };
   }
 
@@ -85,6 +87,10 @@ export function CampaignCreateForm({ onCreated, onClose }: CampaignCreateFormPro
       const out = await createCampaign(input, { force });
       if (out.status === 'invalid_url') {
         setError('Lien invalide : http/https requis.');
+        return;
+      }
+      if (out.status === 'missing_code' || out.status === 'code_too_long') {
+        setError('Code promo invalide.'); // unreachable until the form gains a promo mode
         return;
       }
       if (out.status === 'ok') {

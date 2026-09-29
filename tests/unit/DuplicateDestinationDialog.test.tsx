@@ -16,6 +16,8 @@ const existing: Campaign = {
   investedAmountEur: null,
   venue: null,
   productImageUrl: null,
+  rewardType: 'site',
+  promoCode: null,
 };
 
 describe('DuplicateDestinationDialog', () => {

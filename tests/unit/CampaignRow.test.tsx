@@ -20,6 +20,8 @@ const base: CampaignRowVM = {
   investedAmountEur: null,
   venue: null,
   productImageUrl: null,
+  rewardType: 'site',
+  promoCode: null,
   ownerId: 'o1',
   ownerName: 'Eliah',
   ownerColor: '#f00',

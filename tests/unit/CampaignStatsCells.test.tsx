@@ -47,6 +47,8 @@ describe('CampaignsList headline', () => {
     investedAmountEur: null,
     venue: null,
     productImageUrl: null,
+    rewardType: 'site',
+    promoCode: null,
     ownerId: 'o1',
     ownerName: 'A',
     ownerColor: '#000',

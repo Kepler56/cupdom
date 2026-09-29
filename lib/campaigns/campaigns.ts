@@ -2,7 +2,7 @@ import { createClient } from '@/lib/supabase/client';
 import { normalizeUrl } from '@/lib/links';
 import { makeSlug } from '@/lib/campaigns/slug';
 import { emptyStats, loadCampaignStats } from '@/lib/campaigns/stats';
-import type { Campaign, CampaignRowVM, CampaignState, CampaignStats, Profile } from '@/types/domain';
+import type { Campaign, CampaignRowVM, CampaignState, CampaignStats, Profile, RewardType } from '@/types/domain';
 
 /** Campaign joined to its effective owner (linked contact's owner) + display fields. */
 export interface CampaignWithOwner extends Campaign {
@@ -24,13 +24,15 @@ type CampaignRow = {
   invested_amount_eur: number | null;
   venue: string | null;
   product_image_url: string | null;
+  reward_type: RewardType;
+  promo_code: string | null;
 };
 
 type JoinedRow = CampaignRow & {
   deals: { title: string | null; contacts: { owner_id: string; company: string | null } | null } | null;
 };
 
-const COLS = 'slug, sponsor_name, name, product, destination_url, active, deal_id, distributed_count, created_at, invested_amount_eur, venue, product_image_url';
+const COLS = 'slug, sponsor_name, name, product, destination_url, active, deal_id, distributed_count, created_at, invested_amount_eur, venue, product_image_url, reward_type, promo_code';
 const JOIN_COLS = `${COLS}, deals(title, contacts(owner_id, company))`;
 
 function mapCampaign(r: CampaignRow): Campaign {
@@ -47,6 +49,8 @@ function mapCampaign(r: CampaignRow): Campaign {
     investedAmountEur: r.invested_amount_eur,
     venue: r.venue,
     productImageUrl: r.product_image_url,
+    rewardType: r.reward_type === 'promo' ? 'promo' : 'site',
+    promoCode: r.promo_code,
   };
 }
 
@@ -59,6 +63,36 @@ export function httpDestinationOrNull(raw: string): string | null {
   } catch {
     return null;
   }
+}
+
+export const PROMO_CODE_MAX = 64;
+
+export type RewardError = 'invalid_url' | 'missing_code' | 'code_too_long';
+export interface RewardInput {
+  rewardType: RewardType;
+  promoCode: string;
+  destinationUrl: string;
+}
+export interface RewardFields {
+  reward_type: RewardType;
+  destination_url: string;
+  promo_code?: string;
+}
+
+/**
+ * Validate a reward (spec §3.1/§4.1) into the exact column patch. Mirrors the DB
+ * check qr_campaigns_reward_chk so the owner gets a French message instead of a
+ * 23514. In 'site' mode promo_code is deliberately ABSENT from the patch, so a
+ * code typed earlier survives and switching back to promo needs no retyping.
+ */
+export function rewardFieldsOrError(i: RewardInput): { ok: true; fields: RewardFields } | { ok: false; error: RewardError } {
+  const destination = httpDestinationOrNull(i.destinationUrl);
+  if (!destination) return { ok: false, error: 'invalid_url' };
+  if (i.rewardType === 'site') return { ok: true, fields: { reward_type: 'site', destination_url: destination } };
+  const code = i.promoCode.trim();
+  if (code === '') return { ok: false, error: 'missing_code' };
+  if (code.length > PROMO_CODE_MAX) return { ok: false, error: 'code_too_long' };
+  return { ok: true, fields: { reward_type: 'promo', promo_code: code, destination_url: destination } };
 }
 
 /** All campaigns with their effective owner + deal/contact display fields. Scope filtered client-side. */
@@ -86,11 +120,15 @@ export interface CampaignCreateInput {
   name: string;
   destinationUrl: string;
   product?: string;
+  rewardType: RewardType;
+  promoCode: string;
 }
 
 export type CreateOutcome =
   | { status: 'ok'; campaign: Campaign }
   | { status: 'invalid_url' }
+  | { status: 'missing_code' }
+  | { status: 'code_too_long' }
   | { status: 'duplicate_active'; existing: Campaign }
   | { status: 'duplicate_terminee'; existing: Campaign };
 
@@ -102,7 +140,7 @@ async function findByDestination(normalizedUrl: string): Promise<Campaign[]> {
 }
 
 /** Insert a brand-new Active campaign, retrying on a slug collision (opaque PK). */
-async function insertNew(input: CampaignCreateInput, destination: string): Promise<Campaign> {
+async function insertNew(input: CampaignCreateInput, fields: RewardFields): Promise<Campaign> {
   const supabase = createClient();
   let lastError: unknown = null;
   for (let attempt = 0; attempt < 5; attempt++) {
@@ -113,7 +151,7 @@ async function insertNew(input: CampaignCreateInput, destination: string): Promi
         sponsor_name: input.contactCompany,
         name: input.name.trim() === '' ? null : input.name.trim(),
         product: input.product?.trim() ? input.product.trim() : null,
-        destination_url: destination,
+        ...fields,
         active: true,
         deal_id: input.dealId,
       })
@@ -138,8 +176,9 @@ export async function createCampaign(
   input: CampaignCreateInput,
   opts: { force?: boolean } = {},
 ): Promise<CreateOutcome> {
-  const destination = httpDestinationOrNull(input.destinationUrl);
-  if (!destination) return { status: 'invalid_url' };
+  const reward = rewardFieldsOrError(input);
+  if (!reward.ok) return { status: reward.error };
+  const destination = reward.fields.destination_url;
 
   if (!opts.force) {
     const existing = await findByDestination(destination);
@@ -149,7 +188,7 @@ export async function createCampaign(
       return { status: 'duplicate_terminee', existing: existing[0] };
     }
   }
-  return { status: 'ok', campaign: await insertNew(input, destination) };
+  return { status: 'ok', campaign: await insertNew(input, reward.fields) };
 }
 
 // ── Lifecycle (AC-11/12/13) ──────────────────────────────────────────────────
@@ -167,6 +206,15 @@ export async function editDestination(slug: string, url: string): Promise<{ ok: 
   if (!destination) return { ok: false, reason: 'invalid_url' };
   const supabase = createClient();
   const { error } = await supabase.from('qr_campaigns').update({ destination_url: destination }).eq('slug', slug);
+  if (error) throw error;
+  return { ok: true };
+}
+
+/** Edit the reward (mode + code + link). Slug/QR untouched; the trigger logs a destination_change. */
+export async function setReward(slug: string, i: RewardInput): Promise<{ ok: true } | { ok: false; error: RewardError }> {
+  const reward = rewardFieldsOrError(i);
+  if (!reward.ok) return reward;
+  const { error } = await createClient().from('qr_campaigns').update(reward.fields).eq('slug', slug);
   if (error) throw error;
   return { ok: true };
 }
