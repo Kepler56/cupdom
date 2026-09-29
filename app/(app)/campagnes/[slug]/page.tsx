@@ -1,31 +1,26 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { CampaignDetailHeader } from '@/components/organisms/CampaignDetailHeader';
-import { CampaignMetrics } from '@/components/organisms/CampaignMetrics';
-import { FunnelBars } from '@/components/organisms/FunnelBars';
+import { CampaignAnalyticsPanel } from '@/components/organisms/CampaignAnalyticsPanel';
 import { CampaignLeadsTable } from '@/components/organisms/CampaignLeadsTable';
 import { QrDialog } from '@/components/molecules/QrDialog';
 import { useCanEdit } from '@/lib/scope';
 import { useProfiles } from '@/lib/profiles';
 import { listScopeCampaigns, setCampaignState, type CampaignWithOwner } from '@/lib/campaigns/campaigns';
-import { emptyStats, loadCampaignStats } from '@/lib/campaigns/stats';
 import { buildFunnel, loadFunnelSources } from '@/lib/funnel';
-import { listCampaignLeads } from '@/lib/leads';
-import type { CampaignStats, Funnel } from '@/types/domain';
+import type { Funnel } from '@/types/domain';
 
-// Campaign DETAIL page (Spec 4 AC-9): header + key metrics + conversion funnel + leads list (CSV).
+// Campaign DETAIL page: header + analytics dashboard (KPIs, charts, funnel) + leads list (CSV).
 // Reuses 2A (QR/lifecycle/state badge), 3A (leads table), and the Spec 4 funnel math/bars.
 export default function CampaignDetailPage() {
   const slug = String(useParams().slug ?? '');
   const { profiles } = useProfiles();
 
   const [campaign, setCampaign] = useState<CampaignWithOwner | null>(null);
-  const [stats, setStats] = useState<CampaignStats>(() => emptyStats(slug));
   const [funnel, setFunnel] = useState<Funnel>(() => buildFunnel({ distribues: 0, scannes: 0, formulaireVu: 0, formulaireSoumis: 0, offreAtteinte: 0 }));
-  const [leadsCount, setLeadsCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [qrOpen, setQrOpen] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
@@ -34,24 +29,17 @@ export default function CampaignDetailPage() {
     let active = true;
     setLoading(true);
     (async () => {
-      // The campaign list, stats, funnel and leads are independent — stats/funnel/leads
-      // key off the URL slug, not off the list — so they run in ONE parallel batch
-      // instead of awaiting the list first. Netlify(Ohio)→Supabase(eu-west) makes each
-      // serial round-trip ~85ms; this removes one from every detail-page load. Behaviour
-      // is unchanged: the campaign is still resolved by `.find()` over the same
-      // scope-filtered list (a slug outside the current scope still reads « introuvable »).
-      const [list, statsMap, sources, leads] = await Promise.all([
-        listScopeCampaigns(),
-        loadCampaignStats([slug]),
-        loadFunnelSources(slug),
-        listCampaignLeads(slug).catch(() => []),
-      ]);
+      // The campaign list and funnel are independent — the funnel keys off the URL slug,
+      // not off the list — so they run in ONE parallel batch instead of awaiting the list
+      // first. Netlify(Ohio)→Supabase(eu-west) makes each serial round-trip ~85ms; this
+      // removes one from every detail-page load. Behaviour is unchanged: the campaign is
+      // still resolved by `.find()` over the same scope-filtered list (a slug outside the
+      // current scope still reads « introuvable »).
+      const [list, sources] = await Promise.all([listScopeCampaigns(), loadFunnelSources(slug)]);
       const c = list.find((x) => x.slug === slug) ?? null;
       if (!active) return;
       setCampaign(c);
-      setStats(statsMap[slug] ?? emptyStats(slug));
       setFunnel(buildFunnel(sources));
-      setLeadsCount(leads.length);
       setLoading(false);
     })().catch(() => {
       if (active) setLoading(false);
@@ -93,12 +81,9 @@ export default function CampaignDetailPage() {
         onShowQr={() => setQrOpen(true)}
       />
 
-      <CampaignMetrics stats={stats} leads={leadsCount} />
-
-      <section className="rounded-card border border-border bg-surface p-5">
-        <h2 className="mb-4 text-sm font-semibold text-text">Entonnoir de conversion</h2>
-        <FunnelBars funnel={funnel} />
-      </section>
+      <Suspense fallback={null}>
+        <CampaignAnalyticsPanel campaign={campaign} funnel={funnel} />
+      </Suspense>
 
       <CampaignLeadsTable slug={slug} canEdit={canEdit} />
 
