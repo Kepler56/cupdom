@@ -430,8 +430,10 @@ export const KPI_LABEL_FR: Record<KpiKey, string> = {
   pipeline_eur: 'Pipeline',
 };
 
+export type CampaignKpiKey = 'c_scans' | 'c_uniques' | 'c_leads' | 'c_rate' | 'c_cpl' | 'c_per_cup';
+
 export interface KpiCardData {
-  key: KpiKey;
+  key: KpiKey | CampaignKpiKey;
   label: string;            // French label
   value: string;            // already formatted (number fr-FR or EUR)
   trendPct: number | null;  // signed % vs previous 30 days; null = no trend shown (e.g. pipeline)
