@@ -8,6 +8,9 @@ import { isSpam, normaliseEmail, validateLead } from './validate.ts';
 import { CONSENT_TEXT_FR, CONSENT_VERSION } from './consent.ts';
 import { visitorDate } from './visitorDate.ts';
 import { withRetry } from '../_shared/retry.ts';
+import { publicCampaign, rewardReply, type RewardType } from './reward.ts';
+import { buildPromoEmail } from './promoEmail.ts';
+import { DEFAULT_FROM, sendEmail } from '../_shared/resend.ts';
 
 // deno-lint-ignore no-explicit-any
 type Json = any;
@@ -50,11 +53,13 @@ Deno.serve(async (req: Request): Promise<Response> => {
   // Campaign lookup (service-role bypasses RLS): existence + active + sponsor + destination.
   const { data: campaign } = await supabase
     .from('qr_campaigns')
-    .select('active, sponsor_name, destination_url')
+    .select('active, sponsor_name, destination_url, name, product, product_image_url, reward_type, promo_code')
     .eq('slug', slug)
     .maybeSingle();
   const isActive = campaign?.active === true;
   const sponsor = (campaign?.sponsor_name as string | undefined) ?? '';
+  const rewardType: RewardType = campaign?.reward_type === 'promo' ? 'promo' : 'site';
+  const promoCode = (campaign?.promo_code as string | null | undefined) ?? null;
 
   // Anonymous best-effort visitor hash (no IP stored), consistent with scan.js dedup.
   const ip = req.headers.get('x-forwarded-for')?.split(',')[0].trim() ?? '';
@@ -68,7 +73,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
   if (payload.kind === 'form_view') {
     if (!isActive) return json({ active: false });
     await supabase.from('funnel_events').insert({ campaign_slug: slug, kind: 'form_view', visitor_hash: visitorHash });
-    return json({ active: true, sponsor });
+    return json({ active: true, sponsor, campaign: publicCampaign(campaign ?? {}) });
   }
 
   // ---- full submission ----
@@ -85,7 +90,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
     .eq('visitor_hash', visitorHash)
     .gte('created_at', new Date(Date.now() - 3600_000).toISOString());
   if (isSpam({ honeypot: String(payload.website ?? ''), recentSubmits: recentSubmits ?? 0 })) {
-    return json({ redirect: destination });
+    return json(rewardReply(rewardType, destination, 'skipped', promoCode));
   }
 
   // 3. Server-side validation (source of truth, AC-4/5). The hard gate means storage implies consent.
@@ -117,11 +122,12 @@ Deno.serve(async (req: Request): Promise<Response> => {
     Number.isFinite(lat) && Number.isFinite(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180;
   const geoFields = hasGeo ? { latitude: lat, longitude: lng, geo_source: 'gps' } : {};
 
+  let outcome: 'sent' | 'failed' | 'skipped' = 'skipped';
   try {
     const email = normaliseEmail(input.email);
 
     // 4. UPSERT the lead deduped on (campaign_slug, email) — refresh last_activity_at (AC-10).
-    const leadRes = await withRetry(() =>
+    const leadRes = await withRetry(async () =>
       supabase
         .from('leads')
         .upsert(
@@ -148,7 +154,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
     const lead = leadRes.data;
 
     // 5. Immutable consent record — server-derived text, NO IP (AC-9).
-    const consentRes = await withRetry(() =>
+    const consentRes = await withRetry(async () =>
       supabase.from('lead_consents').insert({
         lead_id: lead?.id ?? null,
         campaign_slug: slug,
@@ -160,17 +166,43 @@ Deno.serve(async (req: Request): Promise<Response> => {
     if (consentRes.error) console.error(JSON.stringify({ evt: 'lead_write_failed', step: 'consent', slug }));
 
     // 6. Funnel events: form_submit (AC-6) then offer_reached just before redirect (AC-7).
-    const funnelRes = await withRetry(() =>
+    const funnelRes = await withRetry(async () =>
       supabase.from('funnel_events').insert([
         { campaign_slug: slug, kind: 'form_submit', visitor_hash: visitorHash },
         { campaign_slug: slug, kind: 'offer_reached', visitor_hash: visitorHash },
       ]),
     );
     if (funnelRes.error) console.error(JSON.stringify({ evt: 'lead_write_failed', step: 'funnel', slug }));
+
+    // 7. Promo reward (spec §4.3): email the shared code. Retried like the writes; a
+    //    final failure is logged and the reply carries the code so the page shows it.
+    if (rewardType === 'promo' && promoCode) {
+      const mail = buildPromoEmail({
+        firstName: input.firstName.trim(),
+        sponsor,
+        campaignName: (campaign?.name as string | null) ?? null,
+        product: (campaign?.product as string | null) ?? null,
+        code: promoCode,
+        link: destination,
+      });
+      const cfg = { apiKey: Deno.env.get('RESEND_API_KEY') ?? '', from: Deno.env.get('DIGEST_FROM') ?? DEFAULT_FROM };
+      const sent = await withRetry(async () => {
+        const r = await sendEmail({ to: email, ...mail }, cfg);
+        return { error: r.ok ? null : r };
+      });
+      outcome = sent.error ? 'failed' : 'sent';
+      if (sent.error) console.error(JSON.stringify({ evt: 'promo_email_failed', slug }));
+      await supabase.from('funnel_events').insert({
+        campaign_slug: slug,
+        kind: outcome === 'sent' ? 'promo_email_sent' : 'promo_email_failed',
+        visitor_hash: visitorHash,
+      });
+    }
   } catch (e) {
     console.error('lead-submit storage failed (forwarding anyway)', e);
+    if (rewardType === 'promo') outcome = 'failed';
   }
 
-  // 7. Forward the consumer to the reward (AC-6/7).
-  return json({ redirect: destination });
+  // 8. Hand the consumer their reward (AC-6/7): a redirect (site) or the promo payload.
+  return json(rewardReply(rewardType, destination, outcome, promoCode));
 });
