@@ -8,7 +8,22 @@ export interface Totals {
 }
 
 const DASH = '—';
-const pct = (part: number, whole: number) => `${Math.round((part / whole) * 100)} %`;
+/**
+ * Campaign ratios are often tiny (0.3 % of cups distributed become leads), so under 10 %
+ * they keep one decimal — a whole-number round would show « 0 % » for a live campaign.
+ * At 10 % and above a decimal is noise, so they stay whole.
+ */
+const pct1 = new Intl.NumberFormat('fr-FR', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+const pct = (part: number, whole: number) => {
+  const v = Math.round((part / whole) * 1000) / 10; // round to 0.1 first: 9.96 → « 10 % », not « 10,0 % »
+  return v < 10 ? `${pct1.format(v)} %` : `${Math.round(v)} %`;
+};
+
+/**
+ * Cost per lead keeps cents. Local on purpose: lib/kpis.ts's whole-euro format serves the
+ * CRM's other pages, but 30 € over 100 leads must read « 0,30 € », never « 0 € ».
+ */
+const eur2 = new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 /**
  * The six campaign tiles (spec §5). Ratios render « — » when an input is missing or
@@ -28,7 +43,7 @@ export function deriveCampaignKpis(
     {
       key: 'c_cpl',
       label: 'Coût par lead',
-      value: c.investedAmountEur && cur.leads > 0 ? formatKpiValue(c.investedAmountEur / cur.leads, 'eur') : DASH,
+      value: c.investedAmountEur && cur.leads > 0 ? eur2.format(c.investedAmountEur / cur.leads) : DASH,
       trendPct: null,
     },
     {

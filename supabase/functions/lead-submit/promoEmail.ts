@@ -4,8 +4,10 @@ import { safeHttpUrl } from './reward.ts';
 const esc = (s: string) =>
   s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 
+// No participant-supplied field (name, etc.) is ever interpolated into the email: the
+// recipient address is whatever was typed in the form, so any free text here would let
+// anyone send arbitrary content from our domain. Only campaign data (set by Cupdom) goes in.
 export interface PromoEmailInput {
-  firstName: string;
   sponsor: string;
   campaignName: string | null;
   product: string | null;
@@ -19,7 +21,7 @@ export function buildPromoEmail(i: PromoEmailInput): { subject: string; html: st
   const subject = `Votre code promo ${i.sponsor}`;
 
   const text = [
-    `Bonjour ${i.firstName},`,
+    'Bonjour,',
     '',
     `Merci d'avoir participé à « ${what} ». Voici votre code promo ${i.sponsor} :`,
     '',
@@ -35,7 +37,7 @@ export function buildPromoEmail(i: PromoEmailInput): { subject: string; html: st
     : '';
 
   const html = `<!doctype html><html lang="fr"><body style="font-family:system-ui,sans-serif;color:#18181b;max-width:520px;margin:auto;padding:24px">
-  <p>Bonjour ${esc(i.firstName)},</p>
+  <p>Bonjour,</p>
   <p>Merci d'avoir participé à « ${esc(what)} ». Voici votre code promo <strong>${esc(i.sponsor)}</strong> :</p>
   <p style="font-family:ui-monospace,monospace;font-size:28px;font-weight:700;letter-spacing:2px;background:#f7f7f8;border:1px dashed #a1a1aa;border-radius:8px;padding:16px;text-align:center">${esc(i.code)}</p>
   ${button}

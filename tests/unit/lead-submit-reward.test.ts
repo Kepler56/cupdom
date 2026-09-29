@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { publicCampaign, rewardReply, safeHttpUrl } from '@/supabase/functions/lead-submit/reward';
+import { PROMO_EMAIL_WINDOW_MS, publicCampaign, recentlyEmailed, rewardReply, safeHttpUrl } from '@/supabase/functions/lead-submit/reward';
 
 describe('safeHttpUrl', () => {
   it('keeps http(s) and refuses everything else', () => {
@@ -43,5 +43,43 @@ describe('rewardReply', () => {
     expect(rewardReply('promo', 'https://nike.fr', 'failed', 'C10')).toEqual({
       promo: { link: 'https://nike.fr', emailed: false, code: 'C10' },
     });
+  });
+  it('promo show (rate-limited, not honeypot) → code on screen, not emailed', () => {
+    expect(rewardReply('promo', 'https://nike.fr', 'show', 'C10')).toEqual({
+      promo: { link: 'https://nike.fr', emailed: false, code: 'C10' },
+    });
+  });
+  it('promo show without a code → nothing to show, looks sent', () => {
+    expect(rewardReply('promo', 'https://nike.fr', 'show', null)).toEqual({ promo: { link: 'https://nike.fr', emailed: true } });
+  });
+  it('site show → still a plain redirect', () => {
+    expect(rewardReply('site', 'https://nike.fr', 'show', 'C10')).toEqual({ redirect: 'https://nike.fr' });
+  });
+});
+
+describe('recentlyEmailed (per-recipient promo throttle)', () => {
+  const now = new Date('2026-09-29T12:00:00.000Z');
+  const ago = (ms: number) => new Date(now.getTime() - ms).toISOString();
+
+  it('the window is 24 h', () => {
+    expect(PROMO_EMAIL_WINDOW_MS).toBe(24 * 60 * 60 * 1000);
+  });
+  it('no prior lead (or no usable timestamp) → not recent, the email goes out', () => {
+    expect(recentlyEmailed(null, now)).toBe(false);
+    expect(recentlyEmailed('', now)).toBe(false);
+    expect(recentlyEmailed('not a date', now)).toBe(false);
+  });
+  it('activity inside the window → throttled', () => {
+    expect(recentlyEmailed(ago(0), now)).toBe(true);
+    expect(recentlyEmailed(ago(60_000), now)).toBe(true);
+    expect(recentlyEmailed(ago(PROMO_EMAIL_WINDOW_MS - 1), now)).toBe(true);
+  });
+  it('activity 24 h ago or older → email again', () => {
+    expect(recentlyEmailed(ago(PROMO_EMAIL_WINDOW_MS), now)).toBe(false);
+    expect(recentlyEmailed(ago(3 * PROMO_EMAIL_WINDOW_MS), now)).toBe(false);
+  });
+  it('reads Postgres timestamptz strings', () => {
+    expect(recentlyEmailed('2026-09-29T10:00:00.123+00:00', now)).toBe(true);
+    expect(recentlyEmailed('2026-09-27T10:00:00+02:00', now)).toBe(false);
   });
 });

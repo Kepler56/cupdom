@@ -106,3 +106,14 @@ export function isSpam(args: { honeypot: string; recentSubmits: number; limit?: 
   if (args.honeypot.trim() !== '') return true;
   return args.recentSubmits > (args.limit ?? 5);
 }
+
+/**
+ * Which anti-abuse rule fired, if any. Same verdict as isSpam (spam ⇔ non-null), split so
+ * lead-submit can treat the two differently: a filled honeypot is a bot (reply as if
+ * sent, nothing stored), but the per-visitor rate limit is shared by everyone behind one
+ * IP + UA (a bar's Wi-Fi), so a rate-limited promo participant still gets the code.
+ */
+export function abuseKind(args: { honeypot: string; recentSubmits: number; limit?: number }): 'honeypot' | 'rate_limited' | null {
+  if (!isSpam(args)) return null;
+  return args.honeypot.trim() !== '' ? 'honeypot' : 'rate_limited';
+}

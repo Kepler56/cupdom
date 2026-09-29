@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { CampaignCard } from '@/components/public/CampaignCard';
 
@@ -13,6 +13,15 @@ describe('CampaignCard', () => {
     const img = screen.getByRole('img', { name: 'Gourde' });
     expect(img).toHaveAttribute('width');
     expect(img).toHaveAttribute('height');
+  });
+
+  it('a photo that fails to load drops the image box, the text stays', () => {
+    render(
+      <CampaignCard sponsor="Nike" campaign={{ name: 'Été 2026', product: 'Gourde', imageUrl: 'https://x.supabase.co/gone.jpg', rewardType: 'site' }} />,
+    );
+    fireEvent.error(screen.getByRole('img', { name: 'Gourde' }));
+    expect(screen.queryByRole('img')).not.toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Été 2026' })).toBeInTheDocument();
   });
 
   it('no photo → no image box; no name → falls back to the sponsor offer heading', () => {

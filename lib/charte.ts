@@ -2,8 +2,8 @@
  * The Cupdom charte graphique (Édition 01, juin 2026) as typed constants.
  *
  * Mirrors the CSS custom properties in app/globals.css. Both exist because the
- * UI needs CSS variables while Recharts takes colours as JS props. The unit
- * test locks these values so the two cannot drift apart unnoticed.
+ * UI needs CSS variables while Recharts takes colours as JS props. Nothing
+ * checks the two against each other: change a colour in both places at once.
  *
  * HARD RULE: jaune is NEVER text on white — it fails contrast. Fills, marks and
  * series only. Text on jaune is always encre.

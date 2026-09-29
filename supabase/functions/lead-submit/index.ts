@@ -4,11 +4,11 @@
 // submission (validate → anti-abuse drop → dedup upsert → consent row → funnel events → redirect).
 // Not part of the Next typecheck (Deno globals + URL imports) — excluded in tsconfig.
 import { createClient } from '@supabase/supabase-js';
-import { isSpam, normaliseEmail, validateLead } from './validate.ts';
+import { abuseKind, normaliseEmail, validateLead } from './validate.ts';
 import { CONSENT_TEXT_FR, CONSENT_VERSION } from './consent.ts';
 import { visitorDate } from './visitorDate.ts';
 import { withRetry } from '../_shared/retry.ts';
-import { publicCampaign, rewardReply, type RewardType } from './reward.ts';
+import { publicCampaign, recentlyEmailed, rewardReply, type RewardOutcome, type RewardType } from './reward.ts';
 import { buildPromoEmail } from './promoEmail.ts';
 import { DEFAULT_FROM, sendEmail } from '../_shared/resend.ts';
 
@@ -51,11 +51,14 @@ Deno.serve(async (req: Request): Promise<Response> => {
   if (!slug) return json({ error: 'missing slug' }, 400);
 
   // Campaign lookup (service-role bypasses RLS): existence + active + sponsor + destination.
-  const { data: campaign } = await supabase
+  const { data: campaign, error: campaignError } = await supabase
     .from('qr_campaigns')
     .select('active, sponsor_name, destination_url, name, product, product_image_url, reward_type, promo_code')
     .eq('slug', slug)
     .maybeSingle();
+  if (campaignError) {
+    console.error(JSON.stringify({ evt: 'campaign_lookup_failed', slug, message: campaignError.message }));
+  }
   const isActive = campaign?.active === true;
   const sponsor = (campaign?.sponsor_name as string | undefined) ?? '';
   const rewardType: RewardType = campaign?.reward_type === 'promo' ? 'promo' : 'site';
@@ -82,6 +85,9 @@ Deno.serve(async (req: Request): Promise<Response> => {
   const destination = (campaign?.destination_url as string | undefined) ?? Deno.env.get('QR_FALLBACK_URL') ?? 'https://cupdom.fr';
 
   // 2. Anti-abuse (AC-8): honeypot or rate-limit ⇒ store nothing, but still forward the consumer.
+  //    Promo mode splits the two: a honeypot hit looks sent (no code, no email), while a
+  //    rate-limited participant — the limit is per IP+UA, so shared Wi-Fi trips it — gets
+  //    the code on screen once their input validates. Site mode: unchanged, redirect.
   const { count: recentSubmits } = await supabase
     .from('funnel_events')
     .select('id', { count: 'exact', head: true })
@@ -89,7 +95,8 @@ Deno.serve(async (req: Request): Promise<Response> => {
     .eq('kind', 'form_submit')
     .eq('visitor_hash', visitorHash)
     .gte('created_at', new Date(Date.now() - 3600_000).toISOString());
-  if (isSpam({ honeypot: String(payload.website ?? ''), recentSubmits: recentSubmits ?? 0 })) {
+  const abuse = abuseKind({ honeypot: String(payload.website ?? ''), recentSubmits: recentSubmits ?? 0 });
+  if (abuse === 'honeypot' || (abuse === 'rate_limited' && rewardType === 'site')) {
     return json(rewardReply(rewardType, destination, 'skipped', promoCode));
   }
 
@@ -103,6 +110,8 @@ Deno.serve(async (req: Request): Promise<Response> => {
   };
   const errors = validateLead(input);
   if (Object.keys(errors).length > 0) return json({ errors }, 422);
+  // Rate-limited promo participant: code on screen, nothing stored, no email.
+  if (abuse === 'rate_limited') return json(rewardReply(rewardType, destination, 'show', promoCode));
 
   // From here on, a DB hiccup must NOT block the reward — retry, then log and still
   // redirect (mirrors scan.js). The writes run BEFORE the response, so retrying makes
@@ -122,9 +131,25 @@ Deno.serve(async (req: Request): Promise<Response> => {
     Number.isFinite(lat) && Number.isFinite(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180;
   const geoFields = hasGeo ? { latitude: lat, longitude: lng, geo_source: 'gps' } : {};
 
-  let outcome: 'sent' | 'failed' | 'skipped' = 'skipped';
+  let outcome: RewardOutcome = 'skipped';
   try {
     const email = normaliseEmail(input.email);
+
+    // Per-recipient throttle (promo only): read BEFORE the upsert refreshes
+    // last_activity_at. An address already active on this campaign in the last 24 h
+    // gets no new email, so the form cannot be used to hammer an arbitrary inbox.
+    // A failed read fails open (email sent) — the visitor-level limit still applies.
+    let throttled = false;
+    if (rewardType === 'promo' && promoCode) {
+      const prior = await supabase
+        .from('leads')
+        .select('last_activity_at')
+        .eq('campaign_slug', slug)
+        .eq('email', email)
+        .maybeSingle();
+      if (prior.error) console.error(JSON.stringify({ evt: 'lead_lookup_failed', slug, message: prior.error.message }));
+      throttled = recentlyEmailed((prior.data?.last_activity_at as string | null | undefined) ?? null, new Date());
+    }
 
     // 4. UPSERT the lead deduped on (campaign_slug, email) — refresh last_activity_at (AC-10).
     const leadRes = await withRetry(async () =>
@@ -176,9 +201,9 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
     // 7. Promo reward (spec §4.3): email the shared code. Retried like the writes; a
     //    final failure is logged and the reply carries the code so the page shows it.
-    if (rewardType === 'promo' && promoCode) {
+    //    Throttled recipient: no email, outcome stays 'skipped' (reply looks sent).
+    if (rewardType === 'promo' && promoCode && !throttled) {
       const mail = buildPromoEmail({
-        firstName: input.firstName.trim(),
         sponsor,
         campaignName: (campaign?.name as string | null) ?? null,
         product: (campaign?.product as string | null) ?? null,
@@ -192,11 +217,14 @@ Deno.serve(async (req: Request): Promise<Response> => {
       });
       outcome = sent.error ? 'failed' : 'sent';
       if (sent.error) console.error(JSON.stringify({ evt: 'promo_email_failed', slug }));
-      await supabase.from('funnel_events').insert({
+      const promoEvt = await supabase.from('funnel_events').insert({
         campaign_slug: slug,
         kind: outcome === 'sent' ? 'promo_email_sent' : 'promo_email_failed',
         visitor_hash: visitorHash,
       });
+      if (promoEvt.error) {
+        console.error(JSON.stringify({ evt: 'lead_write_failed', step: 'promo_funnel', slug, message: promoEvt.error.message }));
+      }
     }
   } catch (e) {
     console.error('lead-submit storage failed (forwarding anyway)', e);

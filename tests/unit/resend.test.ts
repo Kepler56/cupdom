@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { sendEmail } from '@/supabase/functions/_shared/resend';
+import { RESEND_TIMEOUT_MS, sendEmail } from '@/supabase/functions/_shared/resend';
 
 const msg = { to: 'a@b.fr', subject: 'S', html: '<p>h</p>', text: 't' };
 
@@ -26,6 +26,31 @@ describe('sendEmail', () => {
   it('reports a network error without throwing', async () => {
     const fetchImpl = vi.fn().mockRejectedValue(new Error('offline'));
     expect(await sendEmail(msg, { apiKey: 'k', from: 'f', fetchImpl })).toEqual({ ok: false, status: 0, error: 'offline' });
+  });
+
+  it('passes a 5 s abort signal to fetch', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(new Response('{}', { status: 200 }));
+    await sendEmail(msg, { apiKey: 'k', from: 'f', fetchImpl });
+    expect(RESEND_TIMEOUT_MS).toBe(5000);
+    expect(fetchImpl.mock.calls[0][1].signal).toBeInstanceOf(AbortSignal);
+  });
+
+  it('reports a timeout (AbortError) without throwing', async () => {
+    const abort = Object.assign(new Error('The operation was aborted due to timeout'), { name: 'AbortError' });
+    const fetchImpl = vi.fn().mockRejectedValue(abort);
+    expect(await sendEmail(msg, { apiKey: 'k', from: 'f', fetchImpl })).toEqual({
+      ok: false,
+      status: 0,
+      error: 'The operation was aborted due to timeout',
+    });
+  });
+
+  it('reports a DOMException TimeoutError without throwing', async () => {
+    const fetchImpl = vi.fn().mockRejectedValue(new DOMException('signal timed out', 'TimeoutError'));
+    // Test env's DOMException may not extend Error, so only the message is pinned loosely.
+    const r = await sendEmail(msg, { apiKey: 'k', from: 'f', fetchImpl });
+    expect(r).toMatchObject({ ok: false, status: 0 });
+    expect(r.error).toContain('signal timed out');
   });
 
   it('refuses to send without a key', async () => {

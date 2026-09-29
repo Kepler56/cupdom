@@ -46,6 +46,30 @@ describe('lead-submit validate parity', () => {
   });
 });
 
+describe('abuseKind (honeypot vs rate limit, same verdict as isSpam)', () => {
+  const cases = [
+    { honeypot: '', recentSubmits: 0 },
+    { honeypot: '', recentSubmits: 5 },
+    { honeypot: '', recentSubmits: 6 },
+    { honeypot: 'x', recentSubmits: 0 },
+    { honeypot: 'x', recentSubmits: 9 },
+    { honeypot: '   ', recentSubmits: 9 },
+    { honeypot: '', recentSubmits: 2, limit: 1 },
+  ];
+  it('spam ⇔ non-null, for every case', () => {
+    for (const c of cases) expect(edge.abuseKind(c) !== null).toBe(edge.isSpam(c));
+  });
+  it('a filled honeypot wins over the rate limit', () => {
+    expect(edge.abuseKind({ honeypot: 'x', recentSubmits: 0 })).toBe('honeypot');
+    expect(edge.abuseKind({ honeypot: 'x', recentSubmits: 9 })).toBe('honeypot');
+  });
+  it('over the limit with an empty honeypot → rate_limited', () => {
+    expect(edge.abuseKind({ honeypot: '', recentSubmits: 6 })).toBe('rate_limited');
+    expect(edge.abuseKind({ honeypot: '   ', recentSubmits: 6 })).toBe('rate_limited');
+    expect(edge.abuseKind({ honeypot: '', recentSubmits: 5 })).toBeNull();
+  });
+});
+
 describe('isSpam (Edge anti-abuse)', () => {
   it('honeypot non-empty ⇒ spam', () => {
     expect(edge.isSpam({ honeypot: 'http://x', recentSubmits: 0 })).toBe(true);
