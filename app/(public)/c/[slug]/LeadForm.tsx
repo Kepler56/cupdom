@@ -10,6 +10,7 @@ import { EndedCampaignCard } from '@/components/public/EndedCampaignCard';
 import { CONSENT_VERSION } from '@/lib/public/consent';
 import { PhoneField, type PhoneValue } from '@/components/public/PhoneField';
 import { toE164, validateLead, type LeadErrors } from '@/lib/public/validation';
+import { requestPosition } from '@/lib/public/geolocation';
 import { httpOrNull } from '@/lib/public/safeUrl';
 import { CampaignCard } from '@/components/public/CampaignCard';
 import { PromoSentCard } from '@/components/public/PromoSentCard';
@@ -32,7 +33,8 @@ export function LeadForm({ slug }: { slug: string }) {
   // the data-sharing one: precise GPS is sensitive, so it is opt-in and captured only
   // if the browser then grants it. Denied/unavailable → we continue without it.
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
-  const [geoStatus, setGeoStatus] = useState<'idle' | 'pending' | 'ok' | 'denied' | 'unavailable'>('idle');
+  const [geoStatus, setGeoStatus] = useState<'idle' | 'pending' | 'ok' | 'denied' | 'unavailable' | 'timeout' | 'unsupported'>('idle');
+  const geoToken = useRef(0); // bumped on every toggle so a late result from a cancelled request is ignored
   const [website, setWebsite] = useState(''); // honeypot — real users leave it empty
   const [errors, setErrors] = useState<LeadErrors>({});
   const [submitting, setSubmitting] = useState(false);
@@ -49,27 +51,24 @@ export function LeadForm({ slug }: { slug: string }) {
   }, [slug]);
 
   function onToggleLocation(checked: boolean) {
+    const token = ++geoToken.current;
     if (!checked) {
       setCoords(null);
       setGeoStatus('idle');
       return;
     }
-    if (typeof navigator === 'undefined' || !('geolocation' in navigator)) {
-      setGeoStatus('unavailable');
-      return;
-    }
     setGeoStatus('pending');
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+    const geo = typeof navigator === 'undefined' ? undefined : navigator.geolocation;
+    void requestPosition(geo).then((res) => {
+      if (token !== geoToken.current) return; // user unticked (or re-toggled) meanwhile
+      if (res.ok) {
+        setCoords({ lat: res.lat, lng: res.lng });
         setGeoStatus('ok');
-      },
-      () => {
+      } else {
         setCoords(null);
-        setGeoStatus('denied');
-      },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 },
-    );
+        setGeoStatus(res.reason);
+      }
+    });
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -189,9 +188,15 @@ export function LeadForm({ slug }: { slug: string }) {
           {geoStatus === 'pending' && <p className="mt-2 text-xs text-text-muted">Localisation en cours…</p>}
           {geoStatus === 'ok' && <p className="mt-2 text-xs text-success-fg">Position ajoutée.</p>}
           {geoStatus === 'denied' && (
-            <p className="mt-2 text-xs text-text-muted">Localisation refusée — vous pouvez continuer sans.</p>
+            <p className="mt-2 text-xs text-text-muted">
+              Localisation bloquée. Pour l&apos;activer : Réglages › Confidentialité › Service de localisation › Sites Safari
+              (ou les réglages du site dans votre navigateur). Vous pouvez continuer sans.
+            </p>
           )}
-          {geoStatus === 'unavailable' && (
+          {(geoStatus === 'unavailable' || geoStatus === 'timeout') && (
+            <p className="mt-2 text-xs text-text-muted">Position introuvable pour le moment — vous pouvez continuer sans.</p>
+          )}
+          {geoStatus === 'unsupported' && (
             <p className="mt-2 text-xs text-text-muted">Localisation indisponible sur cet appareil.</p>
           )}
         </div>

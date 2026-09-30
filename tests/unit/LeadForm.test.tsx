@@ -217,4 +217,40 @@ describe('LeadForm — reward modes', () => {
     expect(await screen.findByText('Une erreur est survenue. Réessayez.')).toBeInTheDocument();
     expect(assign).not.toHaveBeenCalled();
   });
+
+  describe('precise location', () => {
+    const original = Object.getOwnPropertyDescriptor(navigator, 'geolocation');
+    afterEach(() => {
+      if (original) Object.defineProperty(navigator, 'geolocation', original);
+      else delete (navigator as unknown as Record<string, unknown>).geolocation;
+    });
+    function mockGeo(fn: (ok: PositionCallback, err: PositionErrorCallback) => void) {
+      Object.defineProperty(navigator, 'geolocation', { configurable: true, value: { getCurrentPosition: fn } });
+    }
+
+    it('explains how to unblock when permission is denied', async () => {
+      mockGeo((_ok, err) => err({ code: 1 } as GeolocationPositionError));
+      render(<LeadForm slug="abcd23" />);
+      fireEvent.click(await screen.findByRole('checkbox', { name: /Partager ma position/ }));
+      expect(await screen.findByText(/Localisation bloquée\. Pour l'activer/)).toBeInTheDocument();
+      expect(screen.getByRole('checkbox', { name: /Partager ma position/ })).not.toBeChecked();
+    });
+
+    it('ignores a late result after the user unticks while pending', async () => {
+      let resolveOk!: PositionCallback;
+      mockGeo((ok) => {
+        resolveOk = ok;
+      });
+      render(<LeadForm slug="abcd23" />);
+      const box = await screen.findByRole('checkbox', { name: /Partager ma position/ });
+      fireEvent.click(box);
+      expect(await screen.findByText('Localisation en cours…')).toBeInTheDocument();
+      fireEvent.click(box);
+      resolveOk({ coords: { latitude: 1, longitude: 2 } } as GeolocationPosition);
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(screen.queryByText('Position ajoutée.')).not.toBeInTheDocument();
+      expect(box).not.toBeChecked();
+    });
+  });
 });
