@@ -45,6 +45,7 @@ export function CampaignCreateForm({ onCreated, onClose }: CampaignCreateFormPro
   const [photo, setPhoto] = useState<File | null>(null);
   const [photoError, setPhotoError] = useState<string | null>(null);
   const [photoBusy, setPhotoBusy] = useState(false);
+  const pickToken = useRef(0); // bumped per pick/clear: a late resize of an older pick is dropped
   const [createdWithoutPhoto, setCreatedWithoutPhoto] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -217,14 +218,18 @@ export function CampaignCreateForm({ onCreated, onClose }: CampaignCreateFormPro
               onChange={(e) => {
                 const target = e.target;
                 const picked = target.files?.[0] ?? null;
+                const token = ++pickToken.current;
                 setPhotoError(null);
                 if (!picked) {
                   setPhoto(null);
+                  setPhotoBusy(false);
                   return;
                 }
                 // Downscale first; an undecodable file comes back as-is and fails validation clearly.
+                setPhoto(null);
                 setPhotoBusy(true);
                 void resizePhoto(picked).then((f) => {
+                  if (token !== pickToken.current) return; // a newer pick (or a clear) won
                   setPhotoBusy(false);
                   const check = validateProductPhoto(f);
                   if (!check.ok) {

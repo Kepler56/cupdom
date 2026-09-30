@@ -17,10 +17,12 @@ vi.mock('@/lib/campaigns/campaigns', async (importOriginal) => ({
   setCampaignState: vi.fn(),
 }));
 vi.mock('@/lib/campaigns/productPhotoUpload', () => ({ uploadProductPhoto: (...a: unknown[]) => uploadProductPhoto(...a) }));
-vi.mock('@/lib/campaigns/resizePhoto', () => ({ resizePhoto: async (f: File) => f }));
+const resizePhoto = vi.fn();
+vi.mock('@/lib/campaigns/resizePhoto', () => ({ resizePhoto: (f: File) => resizePhoto(f) }));
 
 beforeEach(() => {
   uploadProductPhoto.mockReset().mockRejectedValue(new Error('boom'));
+  resizePhoto.mockReset().mockImplementation(async (f: File) => f);
   createCampaign.mockReset().mockResolvedValue({ status: 'ok', campaign: { slug: 's1' } });
 });
 
@@ -69,5 +71,65 @@ describe('CampaignCreateForm — campaign created, photo failed', () => {
     fireEvent.keyDown(window, { key: 'Escape' });
     expect(onClose).toHaveBeenCalledTimes(1);
     expect(onCreated).not.toHaveBeenCalled();
+  });
+});
+
+describe('CampaignCreateForm — photo picks resolving out of order', () => {
+  function deferred<T>() {
+    let resolve!: (v: T) => void;
+    const promise = new Promise<T>((r) => (resolve = r));
+    return { promise, resolve };
+  }
+
+  async function openAndChoose() {
+    render(<CampaignCreateForm onCreated={vi.fn()} onClose={vi.fn()} />);
+    await screen.findByRole('option', { name: 'On' });
+    fireEvent.change(screen.getByLabelText('Contact'), { target: { value: 'c1' } });
+    await screen.findByRole('option', { name: 'Deal On' });
+    fireEvent.change(screen.getByLabelText('Deal'), { target: { value: 'd1' } });
+    return screen.getByLabelText('Photo du produit (optionnel)');
+  }
+
+  it('an older pick resolving late does not overwrite the newer pick', async () => {
+    uploadProductPhoto.mockResolvedValue('https://x/p.webp');
+    const older = new File(['a'], 'old.png', { type: 'image/png' });
+    const newer = new File(['b'], 'new.png', { type: 'image/png' });
+    const slow = deferred<File>();
+    resizePhoto.mockImplementation((f: File) => (f === older ? slow.promise : Promise.resolve(f)));
+
+    const input = await openAndChoose();
+    fireEvent.change(input, { target: { files: [older] } });
+    fireEvent.change(input, { target: { files: [newer] } });
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Créer' })).not.toBeDisabled());
+    slow.resolve(older); // late result for the superseded pick
+    await Promise.resolve();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Créer' }));
+    await waitFor(() => expect(uploadProductPhoto).toHaveBeenCalledTimes(1));
+    expect(uploadProductPhoto).toHaveBeenCalledWith('s1', newer);
+  });
+
+  it('a pick cleared before its resize finishes uploads nothing', async () => {
+    const onCreated = vi.fn();
+    const older = new File(['a'], 'old.png', { type: 'image/png' });
+    const slow = deferred<File>();
+    resizePhoto.mockImplementation(() => slow.promise);
+
+    render(<CampaignCreateForm onCreated={onCreated} onClose={vi.fn()} />);
+    await screen.findByRole('option', { name: 'On' });
+    fireEvent.change(screen.getByLabelText('Contact'), { target: { value: 'c1' } });
+    await screen.findByRole('option', { name: 'Deal On' });
+    fireEvent.change(screen.getByLabelText('Deal'), { target: { value: 'd1' } });
+    const input = screen.getByLabelText('Photo du produit (optionnel)');
+    fireEvent.change(input, { target: { files: [older] } });
+    expect(screen.getByRole('button', { name: 'Créer' })).toBeDisabled(); // resizing
+    fireEvent.change(input, { target: { files: [] } });
+    expect(screen.getByRole('button', { name: 'Créer' })).not.toBeDisabled();
+    slow.resolve(older);
+    await Promise.resolve();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Créer' }));
+    await waitFor(() => expect(onCreated).toHaveBeenCalledTimes(1));
+    expect(uploadProductPhoto).not.toHaveBeenCalled();
   });
 });

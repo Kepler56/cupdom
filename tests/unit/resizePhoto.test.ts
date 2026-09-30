@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { fitWithin, PHOTO_MAX_SIDE, resizePhoto } from '@/lib/campaigns/resizePhoto';
+import { alreadyFits, fitWithin, PHOTO_MAX_SIDE, resizePhoto } from '@/lib/campaigns/resizePhoto';
 
 describe('fitWithin', () => {
   it('scales a landscape phone photo so the long side is 1600', () => {
@@ -36,5 +36,20 @@ describe('resizePhoto', () => {
   it('returns the original when the image cannot be decoded (jsdom has no decoder)', async () => {
     const f = new File(['not an image'], 'a.png', { type: 'image/png' });
     expect(await resizePhoto(f)).toBe(f);
+  });
+});
+
+describe('alreadyFits (upload the original, no re-encode)', () => {
+  const MB = 1024 * 1024;
+  it('small in pixels and bytes → keep the original', () => {
+    expect(alreadyFits(1200, 900, 500 * 1024)).toBe(true);
+    expect(alreadyFits(PHOTO_MAX_SIDE, PHOTO_MAX_SIDE, 2 * MB)).toBe(true);
+  });
+  it('too many pixels → re-encode, even if light', () => {
+    expect(alreadyFits(PHOTO_MAX_SIDE + 1, 100, 100 * 1024)).toBe(false);
+    expect(alreadyFits(100, 4032, 100 * 1024)).toBe(false);
+  });
+  it('too heavy → re-encode, even if small in pixels', () => {
+    expect(alreadyFits(1000, 800, 2 * MB + 1)).toBe(false);
   });
 });

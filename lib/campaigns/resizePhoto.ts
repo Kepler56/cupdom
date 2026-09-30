@@ -5,6 +5,13 @@
 export const PHOTO_MAX_SIDE = 1600;
 const QUALITY = 0.85;
 const RESIZABLE = new Set(['image/png', 'image/jpeg', 'image/webp']);
+/** Same cap as the bucket / validateProductPhoto. */
+const MAX_BYTES = 2 * 1024 * 1024;
+
+/** A photo already small enough in pixels AND bytes is uploaded as-is — no lossy re-encode. Pure. */
+export function alreadyFits(width: number, height: number, bytes: number, max: number = PHOTO_MAX_SIDE): boolean {
+  return Math.max(width, height) <= max && bytes <= MAX_BYTES;
+}
 
 /** Fit (w, h) inside max×max, preserving aspect ratio, never upscaling. Pure. */
 export function fitWithin(width: number, height: number, max: number = PHOTO_MAX_SIDE): { width: number; height: number } {
@@ -53,6 +60,7 @@ export async function resizePhoto(file: File): Promise<File> {
     return file;
   }
   try {
+    if (alreadyFits(decoded.width, decoded.height, file.size)) return file;
     const { width, height } = fitWithin(decoded.width, decoded.height);
     if (width === 0) return file;
     const canvas = document.createElement('canvas');
@@ -62,8 +70,16 @@ export async function resizePhoto(file: File): Promise<File> {
     if (!ctx) return file;
     ctx.drawImage(decoded.source, 0, 0, width, height);
 
+    // WebP keeps transparency. JPEG has no alpha — transparent pixels would turn black —
+    // so the JPEG fallback (Safari) is redrawn over white first.
     let blob = await toBlob(canvas, 'image/webp');
-    if (!blob || blob.type !== 'image/webp') blob = await toBlob(canvas, 'image/jpeg');
+    if (!blob || blob.type !== 'image/webp') {
+      ctx.clearRect(0, 0, width, height);
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, width, height);
+      ctx.drawImage(decoded.source, 0, 0, width, height);
+      blob = await toBlob(canvas, 'image/jpeg');
+    }
     if (!blob || (blob.type !== 'image/jpeg' && blob.type !== 'image/webp')) return file;
 
     const ext = blob.type === 'image/webp' ? 'webp' : 'jpg';
