@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/atoms/Button';
 import { Input } from '@/components/atoms/Input';
 import { REWARD_ERROR_FR, RewardFields } from '@/components/molecules/RewardFields';
@@ -11,6 +11,7 @@ import { listDeals } from '@/lib/deals';
 import { createCampaign, setCampaignState, type CampaignCreateInput } from '@/lib/campaigns/campaigns';
 import { PRODUCT_PHOTO_ACCEPT, validateProductPhoto } from '@/lib/campaigns/productPhoto';
 import { uploadProductPhoto } from '@/lib/campaigns/productPhotoUpload';
+import { resizePhoto } from '@/lib/campaigns/resizePhoto';
 import type { Campaign, ContactStatus, Deal, RewardType } from '@/types/domain';
 
 const selectCls =
@@ -43,10 +44,27 @@ export function CampaignCreateForm({ onCreated, onClose }: CampaignCreateFormPro
   const [product, setProduct] = useState('');
   const [photo, setPhoto] = useState<File | null>(null);
   const [photoError, setPhotoError] = useState<string | null>(null);
+  const [photoBusy, setPhotoBusy] = useState(false);
   const [createdWithoutPhoto, setCreatedWithoutPhoto] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [dup, setDup] = useState<{ kind: 'duplicate_active' | 'duplicate_terminee'; existing: Campaign } | null>(null);
+
+  // Once the campaign exists, EVERY way out of the dialog must refresh the list.
+  const dismiss = createdWithoutPhoto ? onCreated : onClose;
+  // Esc reads the latest state through a ref, so it never uses a stale close.
+  const escRef = useRef<() => void>(() => {});
+  escRef.current = () => {
+    if (!dup) dismiss(); // the duplicate dialog on top owns its own Cancel
+  };
+
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') escRef.current();
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
 
   // Only the caller's own, non-archived contacts are selectable (AC-1 / §9).
   useEffect(() => {
@@ -194,23 +212,32 @@ export function CampaignCreateForm({ onCreated, onClose }: CampaignCreateFormPro
             <input
               type="file"
               accept={PRODUCT_PHOTO_ACCEPT}
+              aria-label="Photo du produit (optionnel)"
               className="text-sm text-text-body file:mr-3 file:rounded-input file:border file:border-border-strong file:bg-surface file:px-3 file:py-1.5 file:text-sm file:text-text"
               onChange={(e) => {
-                const f = e.target.files?.[0] ?? null;
+                const target = e.target;
+                const picked = target.files?.[0] ?? null;
                 setPhotoError(null);
-                if (f) {
+                if (!picked) {
+                  setPhoto(null);
+                  return;
+                }
+                // Downscale first; an undecodable file comes back as-is and fails validation clearly.
+                setPhotoBusy(true);
+                void resizePhoto(picked).then((f) => {
+                  setPhotoBusy(false);
                   const check = validateProductPhoto(f);
                   if (!check.ok) {
                     setPhotoError(check.error);
                     setPhoto(null);
-                    e.target.value = '';
+                    target.value = '';
                     return;
                   }
-                }
-                setPhoto(f);
+                  setPhoto(f);
+                });
               }}
             />
-            <span className="text-xs text-text-muted">PNG, JPEG ou WebP, 2 Mo max. Affichée sur le formulaire public.</span>
+            <span className="text-xs text-text-muted">PNG, JPEG ou WebP. Les grandes photos sont réduites automatiquement. Affichée sur le formulaire public.</span>
             {photoError && <span className="text-sm text-danger-fg">{photoError}</span>}
           </label>
         </div>
@@ -224,15 +251,15 @@ export function CampaignCreateForm({ onCreated, onClose }: CampaignCreateFormPro
 
         <div className="mt-6 flex justify-end gap-2">
           {createdWithoutPhoto ? (
-            <Button variant="primary" onClick={onCreated}>
+            <Button variant="primary" onClick={dismiss}>
               Fermer
             </Button>
           ) : (
             <>
-              <Button variant="secondary" onClick={onClose}>
+              <Button variant="secondary" onClick={dismiss}>
                 Annuler
               </Button>
-              <Button variant="primary" disabled={busy} onClick={() => void submit(false)}>
+              <Button variant="primary" disabled={busy || photoBusy} onClick={() => void submit(false)}>
                 {busy ? 'Création…' : 'Créer'}
               </Button>
             </>

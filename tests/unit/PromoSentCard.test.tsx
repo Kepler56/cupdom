@@ -42,7 +42,7 @@ describe('PromoSentCard', () => {
       />,
     );
     expect(screen.getByRole('img', { name: 'chaussure' })).toHaveAttribute('src', 'https://x.supabase.co/a.jpg');
-    expect(screen.getByText('On · Offre exclusive')).toBeInTheDocument();
+    expect(screen.getByText('Proposé par On')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: /Félicitations/ })).toBeInTheDocument();
   });
 

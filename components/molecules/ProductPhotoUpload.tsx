@@ -7,6 +7,8 @@ import { Icon } from '@/components/atoms/Icon';
 import { setProductImageUrl } from '@/lib/campaigns/campaigns';
 import { PRODUCT_PHOTO_ACCEPT } from '@/lib/campaigns/productPhoto';
 import { uploadProductPhoto } from '@/lib/campaigns/productPhotoUpload';
+import { resizePhoto } from '@/lib/campaigns/resizePhoto';
+import { httpOrNull } from '@/lib/public/safeUrl';
 
 interface ProductPhotoUploadProps {
   slug: string;
@@ -18,10 +20,12 @@ interface ProductPhotoUploadProps {
 /**
  * The product photo shown at the top of the public lead form. Same write path as
  * ContactLogo: file → `sponsor-media/products/{slug}/{timestamp}.{ext}`, then the
- * public URL goes on the campaign via setProductImageUrl. Render it only for a
+ * public URL goes on the campaign via setProductImageUrl. Big photos are downscaled in the
+ * browser first (resizePhoto) so they fit the bucket's 2 Mo cap. Render it only for a
  * viewer who can edit the campaign — RLS would refuse the row update anyway.
  */
-export function ProductPhotoUpload({ slug, url, onChanged }: ProductPhotoUploadProps) {
+export function ProductPhotoUpload({ slug, url: rawUrl, onChanged }: ProductPhotoUploadProps) {
+  const url = httpOrNull(rawUrl); // never put a non-http(s) value in <img src>
   const inputRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -32,7 +36,8 @@ export function ProductPhotoUpload({ slug, url, onChanged }: ProductPhotoUploadP
     setError(null);
     setBusy(true);
     try {
-      await uploadProductPhoto(slug, file);
+      // Downscale first (phone photos exceed the 2 Mo bucket cap); undecodable → original, validated below.
+      await uploadProductPhoto(slug, await resizePhoto(file));
       onChanged();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Envoi de la photo impossible. Réessayez.");
@@ -111,7 +116,7 @@ export function ProductPhotoUpload({ slug, url, onChanged }: ProductPhotoUploadP
           </Button>
         )}
       </div>
-      <p className="max-w-48 text-xs text-text-muted">PNG, JPEG ou WebP, 2 Mo max. Affichée sur le formulaire public.</p>
+      <p className="max-w-48 text-xs text-text-muted">PNG, JPEG ou WebP. Les grandes photos sont réduites automatiquement. Affichée sur le formulaire public.</p>
       {error && (
         <p role="alert" className="max-w-60 text-sm text-danger-fg">
           {error}

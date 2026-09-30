@@ -36,7 +36,7 @@ export function CampaignHero({
   const [imageFailed, setImageFailed] = useState(false);
   const src = httpOrNull(campaign.imageUrl);
   const showPhoto = src !== null && !imageFailed;
-  const pill = sponsor ? `${sponsor} · Offre exclusive` : 'Offre exclusive';
+  const pill = sponsor ? `Proposé par ${sponsor}` : null;
   // Without a photo the band has nothing to show off, so it stays short and the form comes up.
   const ratio = compact || !showPhoto ? 'aspect-[2/1]' : 'aspect-[4/3]';
 
@@ -47,7 +47,8 @@ export function CampaignHero({
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={src}
-            alt={campaign.product || campaign.name || sponsor}
+            // The campaign name is the heading right below; repeating it as alt reads it twice.
+            alt={campaign.product || ''}
             width={800}
             height={600}
             decoding="async"
@@ -59,16 +60,18 @@ export function CampaignHero({
       ) : (
         <HeroFallback sponsor={sponsor} />
       )}
-      <span className="absolute left-3 top-3 inline-flex max-w-[calc(100%-1.5rem)] items-center truncate rounded-full bg-surface/95 px-3 py-1 text-xs font-semibold text-text shadow-sm backdrop-blur-sm">
-        {pill}
-      </span>
+      {pill && (
+        <span className="absolute left-3 top-3 inline-flex max-w-[calc(100%-1.5rem)] items-center truncate rounded-full bg-surface/95 px-3 py-1 text-xs font-semibold text-text shadow-sm backdrop-blur-sm">
+          {pill}
+        </span>
+      )}
     </div>
   );
 }
 
 function HeroFallback({ sponsor }: { sponsor: string }) {
   const hue = sponsorHue(sponsor);
-  const initial = (sponsor.trim()[0] ?? 'C').toUpperCase();
+  const initial = (Array.from(sponsor.trim())[0] ?? 'C').toUpperCase(); // code points: no half-emoji
   return (
     <div
       aria-hidden

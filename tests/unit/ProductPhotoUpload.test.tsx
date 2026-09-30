@@ -12,6 +12,8 @@ vi.mock('@/lib/supabase/client', () => ({
     storage: { from: () => ({ upload, getPublicUrl: () => ({ data: { publicUrl: PUBLIC } }) }) },
   }),
 }));
+const resizePhoto = vi.fn();
+vi.mock('@/lib/campaigns/resizePhoto', () => ({ resizePhoto: (f: File) => resizePhoto(f) }));
 vi.mock('@/lib/campaigns/campaigns', () => ({
   setProductImageUrl: (...a: unknown[]) => setProductImageUrl(...a),
 }));
@@ -26,6 +28,7 @@ const input = () => screen.getByLabelText('Fichier photo du produit') as HTMLInp
 beforeEach(() => {
   upload.mockReset().mockResolvedValue({ error: null });
   setProductImageUrl.mockReset().mockResolvedValue(undefined);
+  resizePhoto.mockReset().mockImplementation(async (f: File) => f);
 });
 
 describe('ProductPhotoUpload', () => {
@@ -80,5 +83,24 @@ describe('ProductPhotoUpload', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Retirer' }));
     await waitFor(() => expect(setProductImageUrl).toHaveBeenCalledWith('s1', null));
     expect(onChanged).toHaveBeenCalledTimes(1);
+  });
+
+  it('uploads the downscaled file, so a big phone photo passes the 2 Mo check', async () => {
+    const big = fileOf('image/jpeg', 6 * 1024 * 1024);
+    const small = fileOf('image/webp', 400 * 1024);
+    resizePhoto.mockResolvedValue(small);
+    const onChanged = vi.fn();
+    render(<ProductPhotoUpload slug="s1" url={null} onChanged={onChanged} />);
+    fireEvent.change(input(), { target: { files: [big] } });
+    await waitFor(() => expect(onChanged).toHaveBeenCalled());
+    expect(resizePhoto).toHaveBeenCalledWith(big);
+    expect(upload.mock.calls[0][1]).toBe(small);
+    expect(upload.mock.calls[0][0]).toMatch(/\.webp$/);
+  });
+
+  it('never renders a non-http preview src', () => {
+    render(<ProductPhotoUpload slug="s1" url="javascript:alert(1)" onChanged={() => {}} />);
+    expect(screen.queryByRole('img')).not.toBeInTheDocument();
+    expect(screen.getByText('Glissez une photo ici')).toBeInTheDocument();
   });
 });

@@ -8,7 +8,7 @@ describe('CampaignCard', () => {
   it('leads with the product photo (alt = product type), then the campaign name and the sponsor pill', () => {
     render(<CampaignCard sponsor="Nike" campaign={WITH_PHOTO} />);
     expect(screen.getByRole('heading', { name: 'Été 2026' })).toBeInTheDocument();
-    expect(screen.getByText('Nike · Offre exclusive')).toBeInTheDocument();
+    expect(screen.getByText('Proposé par Nike')).toBeInTheDocument();
     const img = screen.getByRole('img', { name: 'Gourde' });
     expect(img).toHaveAttribute('src', WITH_PHOTO.imageUrl);
     expect(img).toHaveAttribute('width');
@@ -32,7 +32,7 @@ describe('CampaignCard', () => {
     const banner = screen.getByTestId('hero-fallback');
     expect(banner).toHaveTextContent('O');
     expect(banner).toHaveAttribute('aria-hidden');
-    expect(screen.getByText('On · Offre exclusive')).toBeInTheDocument();
+    expect(screen.getByText('Proposé par On')).toBeInTheDocument();
   });
 
   it('no name → falls back to the sponsor offer heading', () => {
@@ -60,5 +60,20 @@ describe('CampaignCard', () => {
     render(<CampaignCard sponsor="On" campaign={{ ...WITH_PHOTO, imageUrl: 'javascript:alert(1)' }} />);
     expect(screen.queryByRole('img')).not.toBeInTheDocument();
     expect(screen.getByTestId('hero-fallback')).toBeInTheDocument();
+  });
+
+  it('photo without a product type → decorative alt, so the name is not read twice', () => {
+    const { container } = render(<CampaignCard sponsor="On" campaign={{ ...WITH_PHOTO, product: '' }} />);
+    expect(container.querySelector('img')).toHaveAttribute('alt', '');
+  });
+
+  it('fallback initial keeps an emoji whole', () => {
+    render(<CampaignCard sponsor="🍹 Bar" campaign={{ ...WITH_PHOTO, imageUrl: null }} />);
+    expect(screen.getByTestId('hero-fallback')).toHaveTextContent('🍹');
+  });
+
+  it('no sponsor → no pill at all', () => {
+    render(<CampaignCard sponsor="" campaign={{ ...WITH_PHOTO, imageUrl: null }} />);
+    expect(screen.queryByText(/Proposé par/)).not.toBeInTheDocument();
   });
 });

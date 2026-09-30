@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Lock } from 'lucide-react';
 import { Button } from '@/components/atoms/Button';
 import { Input } from '@/components/atoms/Input';
 import { Spinner } from '@/components/atoms/Spinner';
@@ -53,6 +52,14 @@ export function LeadForm({ slug }: { slug: string }) {
       setPhase(res.active ? 'active' : 'inactive');
     });
   }, [slug]);
+
+  // Unmount invalidates any in-flight position request, so a late result never sets state.
+  useEffect(
+    () => () => {
+      geoToken.current += 1;
+    },
+    [],
+  );
 
   function onToggleLocation(checked: boolean) {
     const token = ++geoToken.current;
@@ -223,10 +230,7 @@ export function LeadForm({ slug }: { slug: string }) {
           <Button type="submit" disabled={submitting} className="h-13 w-full rounded-card text-base font-bold sm:text-base">
             {submitting ? 'Envoi…' : campaign.rewardType === 'promo' ? 'Recevoir mon code promo' : "Recevoir l'offre"}
           </Button>
-          <p className="mt-3 flex items-center justify-center gap-1.5 text-center text-xs text-text-muted">
-            <Lock aria-hidden size={12} strokeWidth={2.25} className="shrink-0" />
-            Gratuit, sans engagement, désinscription libre.
-          </p>
+          <p className="mt-3 text-center text-xs text-text-muted">Gratuit et sans engagement.</p>
         </div>
       </form>
     </PublicCardShell>
