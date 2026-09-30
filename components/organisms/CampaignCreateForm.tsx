@@ -9,6 +9,8 @@ import { useScope } from '@/lib/scope';
 import { contactDisplayName, listContactsWithStatus } from '@/lib/contacts';
 import { listDeals } from '@/lib/deals';
 import { createCampaign, setCampaignState, type CampaignCreateInput } from '@/lib/campaigns/campaigns';
+import { PRODUCT_PHOTO_ACCEPT, validateProductPhoto } from '@/lib/campaigns/productPhoto';
+import { uploadProductPhoto } from '@/lib/campaigns/productPhotoUpload';
 import type { Campaign, ContactStatus, Deal, RewardType } from '@/types/domain';
 
 const selectCls =
@@ -23,6 +25,10 @@ interface CampaignCreateFormProps {
  * Create flow (AC-1…AC-8). Pick one of YOUR own, non-archived contacts → one of its deals
  * (required) → name + http/https destination + optional product. Duplicate destinations
  * branch to the reactivate/override dialog.
+ *
+ * Optional product photo: checked when picked, uploaded only AFTER the campaign exists (its
+ * slug is the storage folder). A failed upload never undoes the creation — the form says so
+ * and the photo can be added from the campaign page.
  */
 export function CampaignCreateForm({ onCreated, onClose }: CampaignCreateFormProps) {
   const { myId } = useScope();
@@ -35,6 +41,9 @@ export function CampaignCreateForm({ onCreated, onClose }: CampaignCreateFormPro
   const [rewardType, setRewardType] = useState<RewardType>('site');
   const [promoCode, setPromoCode] = useState('');
   const [product, setProduct] = useState('');
+  const [photo, setPhoto] = useState<File | null>(null);
+  const [photoError, setPhotoError] = useState<string | null>(null);
+  const [createdWithoutPhoto, setCreatedWithoutPhoto] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [dup, setDup] = useState<{ kind: 'duplicate_active' | 'duplicate_terminee'; existing: Campaign } | null>(null);
@@ -93,6 +102,15 @@ export function CampaignCreateForm({ onCreated, onClose }: CampaignCreateFormPro
         return;
       }
       if (out.status === 'ok') {
+        if (photo) {
+          try {
+            await uploadProductPhoto(out.campaign.slug, photo);
+          } catch {
+            // The campaign exists; keep the dialog open so the member reads why the photo is missing.
+            setCreatedWithoutPhoto(true);
+            return;
+          }
+        }
         onCreated();
         return;
       }
@@ -171,17 +189,54 @@ export function CampaignCreateForm({ onCreated, onClose }: CampaignCreateFormPro
             }}
           />
           <Input label="Produit (optionnel)" value={product} onChange={(e) => setProduct(e.target.value)} placeholder="gourde, tote…" />
+          <label className="flex flex-col gap-1">
+            <span className="text-xs font-medium text-text-muted">Photo du produit (optionnel)</span>
+            <input
+              type="file"
+              accept={PRODUCT_PHOTO_ACCEPT}
+              className="text-sm text-text-body file:mr-3 file:rounded-input file:border file:border-border-strong file:bg-surface file:px-3 file:py-1.5 file:text-sm file:text-text"
+              onChange={(e) => {
+                const f = e.target.files?.[0] ?? null;
+                setPhotoError(null);
+                if (f) {
+                  const check = validateProductPhoto(f);
+                  if (!check.ok) {
+                    setPhotoError(check.error);
+                    setPhoto(null);
+                    e.target.value = '';
+                    return;
+                  }
+                }
+                setPhoto(f);
+              }}
+            />
+            <span className="text-xs text-text-muted">PNG, JPEG ou WebP, 2 Mo max. Affichée sur le formulaire public.</span>
+            {photoError && <span className="text-sm text-danger-fg">{photoError}</span>}
+          </label>
         </div>
 
         {error && <p className="mt-3 text-sm text-danger-fg">{error}</p>}
+        {createdWithoutPhoto && (
+          <p role="alert" className="mt-3 text-sm text-warning-fg">
+            Campagne créée, mais la photo n&apos;a pas pu être envoyée. Ajoutez-la depuis la page de la campagne.
+          </p>
+        )}
 
         <div className="mt-6 flex justify-end gap-2">
-          <Button variant="secondary" onClick={onClose}>
-            Annuler
-          </Button>
-          <Button variant="primary" disabled={busy} onClick={() => void submit(false)}>
-            {busy ? 'Création…' : 'Créer'}
-          </Button>
+          {createdWithoutPhoto ? (
+            <Button variant="primary" onClick={onCreated}>
+              Fermer
+            </Button>
+          ) : (
+            <>
+              <Button variant="secondary" onClick={onClose}>
+                Annuler
+              </Button>
+              <Button variant="primary" disabled={busy} onClick={() => void submit(false)}>
+                {busy ? 'Création…' : 'Créer'}
+              </Button>
+            </>
+          )}
         </div>
       </div>
 

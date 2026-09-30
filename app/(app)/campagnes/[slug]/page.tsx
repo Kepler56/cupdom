@@ -79,6 +79,7 @@ export default function CampaignDetailPage() {
         ownerColor={owner?.color ?? null}
         onToggle={toggle}
         onShowQr={() => setQrOpen(true)}
+        onPhotoChanged={() => setReloadKey((k) => k + 1)}
       />
 
       <Suspense fallback={null}>

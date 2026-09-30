@@ -10,6 +10,7 @@ import { CampaignStateBadge } from '@/components/molecules/CampaignStateBadge';
 import { DistributedInput } from '@/components/molecules/DistributedInput';
 import { InvestedAmountInput } from '@/components/molecules/InvestedAmountInput';
 import { VenueInput } from '@/components/molecules/VenueInput';
+import { ProductPhotoUpload } from '@/components/molecules/ProductPhotoUpload';
 import { scanUrl } from '@/lib/campaigns/redirectUrl';
 import type { CampaignWithOwner } from '@/lib/campaigns/campaigns';
 
@@ -20,6 +21,8 @@ interface CampaignDetailHeaderProps {
   ownerColor: string | null;
   onToggle: () => void | Promise<void>;
   onShowQr: () => void;
+  /** Reload the campaign after the product photo changed. */
+  onPhotoChanged?: () => void;
 }
 
 /**
@@ -30,8 +33,9 @@ interface CampaignDetailHeaderProps {
  * Montant investi and Lieu / événement are the portal's only inputs for the cost-per-contact
  * tile and venue ranking (Spec 5 §4.7/§4.8) — see InvestedAmountInput's doc comment for the
  * "every campaign must carry an amount" rule that makes the cost tile all-or-nothing.
+ * The product photo (owner only) is the hero image of the public lead form.
  */
-export function CampaignDetailHeader({ campaign, canEdit, ownerName, ownerColor, onToggle, onShowQr }: CampaignDetailHeaderProps) {
+export function CampaignDetailHeader({ campaign, canEdit, ownerName, ownerColor, onToggle, onShowQr, onPhotoChanged }: CampaignDetailHeaderProps) {
   const [busy, setBusy] = useState(false);
 
   async function toggle() {
@@ -60,16 +64,21 @@ export function CampaignDetailHeader({ campaign, canEdit, ownerName, ownerColor,
         {canEdit && <VenueInput slug={campaign.slug} value={campaign.venue} canEdit={canEdit} />}
       </div>
 
-      <div className="flex items-center gap-2">
-        <Button variant="secondary" size="sm" onClick={onShowQr}>
-          <Icon icon={QrCode} size={15} /> Télécharger QR
-        </Button>
-        {canEdit ? (
-          <Button variant="secondary" size="sm" disabled={busy} onClick={() => void toggle()}>
-            <Icon icon={Power} size={15} /> {campaign.state === 'Active' ? 'Désactiver' : 'Réactiver'}
+      <div className="flex flex-col items-start gap-4 sm:items-end">
+        <div className="flex items-center gap-2">
+          <Button variant="secondary" size="sm" onClick={onShowQr}>
+            <Icon icon={QrCode} size={15} /> Télécharger QR
           </Button>
-        ) : (
-          ownerName && <OwnerChip name={ownerName} color={ownerColor ?? '#999'} />
+          {canEdit ? (
+            <Button variant="secondary" size="sm" disabled={busy} onClick={() => void toggle()}>
+              <Icon icon={Power} size={15} /> {campaign.state === 'Active' ? 'Désactiver' : 'Réactiver'}
+            </Button>
+          ) : (
+            ownerName && <OwnerChip name={ownerName} color={ownerColor ?? '#999'} />
+          )}
+        </div>
+        {canEdit && (
+          <ProductPhotoUpload slug={campaign.slug} url={campaign.productImageUrl} onChanged={() => onPhotoChanged?.()} />
         )}
       </div>
     </div>
