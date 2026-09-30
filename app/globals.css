@@ -22,6 +22,9 @@
   --info-fg: #175cd3;
   --radius: 12px;
   --radius-sm: 8px;
+  /* Public lead form hero: soft bottom shade so the photo sits into the card. */
+  --hero-scrim: linear-gradient(to top, rgb(0 0 0 / 0.22), rgb(0 0 0 / 0) 42%);
+  --radius-lg: 20px;
 }
 
 /* ── Tailwind v4 @theme — expose tokens as utilities ────── */
@@ -46,6 +49,7 @@
   --color-info-fg: var(--info-fg);
   --radius-card: var(--radius);
   --radius-input: var(--radius-sm);
+  --radius-hero: var(--radius-lg);
   --font-sans: var(--font-manrope), system-ui, sans-serif;
 }
 

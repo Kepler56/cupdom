@@ -31,4 +31,31 @@ describe('PromoSentCard', () => {
     render(<PromoSentCard email="m@g.com" reply={{ link: 'javascript:alert(1)', emailed: true }} />);
     expect(screen.queryByRole('link', { name: 'Utiliser mon code' })).not.toBeInTheDocument();
   });
+
+  it('carries the campaign photo band when the campaign is passed', () => {
+    render(
+      <PromoSentCard
+        email="m@g.com"
+        reply={{ link: 'https://on.com', emailed: true }}
+        sponsor="On"
+        campaign={{ name: 'Cloud X4', product: 'chaussure', imageUrl: 'https://x.supabase.co/a.jpg', rewardType: 'promo' }}
+      />,
+    );
+    expect(screen.getByRole('img', { name: 'chaussure' })).toHaveAttribute('src', 'https://x.supabase.co/a.jpg');
+    expect(screen.getByText('On · Offre exclusive')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /Félicitations/ })).toBeInTheDocument();
+  });
+
+  it('no photo on the campaign → the same tinted fallback as the form', () => {
+    render(
+      <PromoSentCard
+        email="m@g.com"
+        reply={{ link: 'https://on.com', emailed: true }}
+        sponsor="On"
+        campaign={{ name: 'Cloud X4', product: '', imageUrl: null, rewardType: 'promo' }}
+      />,
+    );
+    expect(screen.queryByRole('img')).not.toBeInTheDocument();
+    expect(screen.getByTestId('hero-fallback')).toBeInTheDocument();
+  });
 });

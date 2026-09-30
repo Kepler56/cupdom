@@ -202,6 +202,40 @@ describe('LeadForm — reward modes', () => {
     expect(assign).not.toHaveBeenCalled();
   });
 
+  it('promo: value line promises the code by e-mail; the note is wired to the Email field', async () => {
+    (postFormView as Mock).mockResolvedValue({
+      active: true,
+      sponsor: 'Nike',
+      campaign: { name: 'Été 2026', product: 'Gourde', imageUrl: null, rewardType: 'promo' },
+    });
+    render(<LeadForm slug="abcd23" />);
+    expect(await screen.findByText('Recevez votre code promo Nike par e-mail')).toBeInTheDocument();
+    expect(screen.getByLabelText('Email')).toHaveAttribute('aria-describedby', 'promo-email-note');
+  });
+
+  it('site: value line points to the offer; no photo shows the fallback banner, not a broken image', async () => {
+    render(<LeadForm slug="abcd23" />);
+    expect(await screen.findByText("Accédez à l'offre Nike")).toBeInTheDocument();
+    expect(screen.getByTestId('hero-fallback')).toBeInTheDocument();
+    expect(screen.queryByRole('img')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Email')).not.toHaveAttribute('aria-describedby');
+  });
+
+  it('the congrats page keeps the campaign photo band from the form', async () => {
+    (postFormView as Mock).mockResolvedValue({
+      active: true,
+      sponsor: 'Nike',
+      campaign: { name: 'Été 2026', product: 'Gourde', imageUrl: 'https://x.supabase.co/a.jpg', rewardType: 'promo' },
+    });
+    (postSubmit as Mock).mockResolvedValue({ promo: { link: 'https://nike.fr/panier', emailed: true } });
+    render(<LeadForm slug="abcd23" />);
+    await fillValid();
+    fireEvent.click(screen.getByRole('checkbox', { name: /J'accepte/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Recevoir mon code promo' }));
+    expect(await screen.findByRole('heading', { name: /Félicitations/ })).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'Gourde' })).toBeInTheDocument();
+  });
+
   it('site: no promo note, still redirects', async () => {
     render(<LeadForm slug="abcd23" />);
     await screen.findByLabelText('Prénom');

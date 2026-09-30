@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { Lock } from 'lucide-react';
 import { Button } from '@/components/atoms/Button';
 import { Input } from '@/components/atoms/Input';
 import { Spinner } from '@/components/atoms/Spinner';
@@ -13,10 +14,13 @@ import { toE164, validateLead, type LeadErrors } from '@/lib/public/validation';
 import { requestPosition } from '@/lib/public/geolocation';
 import { httpOrNull } from '@/lib/public/safeUrl';
 import { CampaignCard } from '@/components/public/CampaignCard';
+import { CampaignHero } from '@/components/public/CampaignHero';
+import { PublicCardShell } from '@/components/public/PublicCardShell';
 import { PromoSentCard } from '@/components/public/PromoSentCard';
 import { EMPTY_CAMPAIGN, postFormView, postSubmit, type PromoReply, type PublicCampaign } from '@/lib/public/leadClient';
 
-// Visuals are intentionally minimal — Spec 4 owns the form polish. Logic/validation/a11y are the contract.
+// Product-first layout: photo hero + campaign name + value line, then the fields.
+// Logic/validation/a11y are the contract; the look lives in CampaignCard / CampaignHero.
 type Phase = 'loading' | 'inactive' | 'active' | 'done';
 
 export function LeadForm({ slug }: { slug: string }) {
@@ -123,30 +127,32 @@ export function LeadForm({ slug }: { slug: string }) {
   if (phase === 'inactive') return <EndedCampaignCard />;
 
   if (phase === 'done') {
-    if (promo) return <PromoSentCard reply={promo} email={email.trim()} />;
+    if (promo) return <PromoSentCard reply={promo} email={email.trim()} campaign={campaign} sponsor={sponsor} />;
     return (
-      <div className="w-full max-w-md rounded-card border border-border bg-surface p-8 text-center shadow-sm">
-        <h1 className="text-xl font-semibold text-text">Merci&nbsp;!</h1>
-        <p className="mt-2 text-sm text-text-muted">Redirection vers votre offre…</p>
-      </div>
+      <PublicCardShell>
+        <CampaignHero campaign={campaign} sponsor={sponsor} compact />
+        <div className="px-5 py-7 text-center sm:px-8">
+          <h1 className="text-2xl font-extrabold tracking-tight text-text">Merci&nbsp;!</h1>
+          <p className="mt-2 text-sm text-text-muted">Redirection vers votre offre…</p>
+        </div>
+      </PublicCardShell>
     );
   }
 
   return (
-    <div className="w-full max-w-md rounded-card border border-border bg-surface p-6 shadow-sm sm:p-8">
+    <PublicCardShell>
       <CampaignCard campaign={campaign} sponsor={sponsor} />
-      <p className="mb-6 text-sm text-text-muted">
-        Renseignez vos coordonnées pour accéder à l&apos;offre. C&apos;est rapide et sans engagement.
-      </p>
 
-      <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-4">
-        <div>
-          <Input label="Prénom" value={firstName} onChange={(e) => setFirstName(e.target.value)} autoComplete="given-name" />
-          <FieldError message={errors.firstName} />
-        </div>
-        <div>
-          <Input label="Nom" value={lastName} onChange={(e) => setLastName(e.target.value)} autoComplete="family-name" />
-          <FieldError message={errors.lastName} />
+      <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-4 px-5 pb-6 pt-6 sm:px-8 sm:pb-8">
+        <div className="grid grid-cols-1 gap-4 min-[360px]:grid-cols-2 min-[360px]:gap-3">
+          <div className="min-w-0">
+            <Input label="Prénom" value={firstName} onChange={(e) => setFirstName(e.target.value)} autoComplete="given-name" />
+            <FieldError message={errors.firstName} />
+          </div>
+          <div className="min-w-0">
+            <Input label="Nom" value={lastName} onChange={(e) => setLastName(e.target.value)} autoComplete="family-name" />
+            <FieldError message={errors.lastName} />
+          </div>
         </div>
         <div>
           <Input
@@ -174,7 +180,7 @@ export function LeadForm({ slug }: { slug: string }) {
           <label className="flex items-start gap-2.5 text-sm text-text">
             <input
               type="checkbox"
-              className="mt-0.5"
+              className="mt-0.5 h-5 w-5 shrink-0 accent-primary sm:h-4 sm:w-4"
               checked={geoStatus === 'ok' || geoStatus === 'pending'}
               onChange={(e) => onToggleLocation(e.target.checked)}
             />
@@ -213,10 +219,16 @@ export function LeadForm({ slug }: { slug: string }) {
           className="absolute left-[-9999px] h-0 w-0 opacity-0"
         />
 
-        <Button type="submit" disabled={submitting} className="mt-2 w-full">
-          {submitting ? 'Envoi…' : campaign.rewardType === 'promo' ? 'Recevoir mon code promo' : "Recevoir l'offre"}
-        </Button>
+        <div className="mt-2">
+          <Button type="submit" disabled={submitting} className="h-13 w-full rounded-card text-base font-bold sm:text-base">
+            {submitting ? 'Envoi…' : campaign.rewardType === 'promo' ? 'Recevoir mon code promo' : "Recevoir l'offre"}
+          </Button>
+          <p className="mt-3 flex items-center justify-center gap-1.5 text-center text-xs text-text-muted">
+            <Lock aria-hidden size={12} strokeWidth={2.25} className="shrink-0" />
+            Gratuit, sans engagement, désinscription libre.
+          </p>
+        </div>
       </form>
-    </div>
+    </PublicCardShell>
   );
 }
